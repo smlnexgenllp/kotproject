@@ -11,6 +11,9 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -41,7 +44,9 @@ INSTALLED_APPS = [
     'corsheaders',
     'user',
     'cashier',
-    'management'
+    'management',
+    'cloudinary_storage',
+    'cloudinary',
 ]
 
 MIDDLEWARE = [
@@ -63,8 +68,9 @@ CORS_ALLOWED_ORIGINS = [
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+    ),
 }
+
 
 AUTH_USER_MODEL = 'management.AdminUser'
 TEMPLATES = [
@@ -148,3 +154,18 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'smlnexgenllp@gmail.com'
 EMAIL_HOST_PASSWORD = 'viep cdra mnmw xbhz'
 DEFAULT_FROM_EMAIL = 'smlnexgenllp@gmail.com'
+
+# ========== CLOUDINARY CONFIG (DIRECTLY) ==========
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': 'dkq48nzr3',
+    'API_KEY': '284497245419884',
+    'API_SECRET': 'T7VuKFXjRa08N85sMEYOfM6jAV4'
+}
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+cloudinary.config(
+    cloud_name='dkq48nzr3',
+    api_key='284497245419884',
+    api_secret='T7VuKFXjRa08N85sMEYOfM6jAV4'
+)
