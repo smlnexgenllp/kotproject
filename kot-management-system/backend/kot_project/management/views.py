@@ -5,7 +5,7 @@ from datetime import timedelta
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from management.models import AdminUser, EmailOTP,FoodItem,RestaurantTable
+from management.models import AdminUser, EmailOTP,FoodItem,RestaurantTable,SubCategory
 from django.contrib.auth.hashers import make_password
 import logging
 from django.contrib.auth import authenticate
@@ -13,7 +13,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
-from .serializers import FoodItemSerializer,RestaurantTableSerializer
+from .serializers import FoodItemSerializer,RestaurantTableSerializer,SubCategorySerializer
 
 logger = logging.getLogger("otp_sender")
 
@@ -165,19 +165,16 @@ class LoginView(APIView):
             "refresh": str(refresh),
         }, status=200)
 
+
 class FoodItemViewSet(viewsets.ModelViewSet):
     """
-    DRF ViewSet for FoodItem model with all standard CRUD operations
-    No authentication required for any operations
+    DRF ViewSet for FoodItem model with stock and timing management
     """
     queryset = FoodItem.objects.filter(is_active=True).order_by('category', 'food_name')
     serializer_class = FoodItemSerializer
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        """
-        Enhanced queryset with filtering capabilities
-        """
         queryset = FoodItem.objects.filter(is_active=True)
         
         # Filter by query parameters
@@ -192,88 +189,191 @@ class FoodItemViewSet(viewsets.ModelViewSet):
         food_type = self.request.query_params.get('food_type')
         if food_type:
             queryset = queryset.filter(food_type=food_type)
+
+        # Filter by stock status
+        stock_status = self.request.query_params.get('stock_status')
+        if stock_status:
+            queryset = queryset.filter(stock_status=stock_status)
             
         return queryset.order_by('category', 'food_name')
 
-    def list(self, request, *args, **kwargs):
-        """
-        GET /api/food-menu/ - List all active food items
-        Optional filters: ?category=food&subcategory=lunch&food_type=veg
-        """
-        return super().list(request, *args, **kwargs)
-
-    def retrieve(self, request, *args, **kwargs):
-        """
-        GET /api/food-menu/{id}/ - Get specific food item
-        """
-        return super().retrieve(request, *args, **kwargs)
-
-    def create(self, request, *args, **kwargs):
-        """
-        POST /api/food-menu/ - Create new food item
-        """
-        try:
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            self.perform_create(serializer)
-            headers = self.get_success_headers(serializer.data)
-            return Response(
-                serializer.data, 
-                status=status.HTTP_201_CREATED, 
-                headers=headers
-            )
-        except Exception as e:
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-    def update(self, request, *args, **kwargs):
-        """
-        PUT /api/food-menu/{id}/ - Full update
-        """
-        return super().update(request, *args, **kwargs)
-
-    def partial_update(self, request, *args, **kwargs):
-        """
-        PATCH /api/food-menu/{id}/ - Partial update
-        """
-        return super().partial_update(request, *args, **kwargs)
-
     def destroy(self, request, *args, **kwargs):
         """
-        DELETE /api/food-menu/{id}/ - Soft delete
+        Soft delete implementation
         """
         instance = self.get_object()
-        self.perform_destroy(instance)
+        instance.is_active = False
+        instance.save()
         return Response(
             {"message": "Food item deleted successfully"}, 
             status=status.HTTP_204_NO_CONTENT
         )
 
-    def perform_create(self, serializer):
-        """Save during creation"""
-        serializer.save()
+    # ────── STOCK MANAGEMENT ACTIONS ──────
+    @action(detail=True, methods=['post'])
+    def update_stock(self, request, pk=None):
+        """
+        POST /api/food-menu/{id}/update_stock/ - Update stock status
+        """
+        food_item = self.get_object()
+        stock_status = request.data.get('stock_status')
+        stock_notes = request.data.get('stock_notes', '')
+        
+        if stock_status in ['in_stock', 'out_of_stock']:
+            food_item.stock_status = stock_status
+            food_item.stock_notes = stock_notes
+            food_item.save()
+            
+            return Response({
+                'message': f'{food_item.food_name} stock status updated to {stock_status}',
+                'stock_status': food_item.stock_status,
+                'is_available_now': food_item.is_available_now(),
+                'availability_status': food_item.availability_status
+            })
+        else:
+            return Response(
+                {'error': 'Invalid stock status. Use "in_stock" or "out_of_stock".'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-    def perform_update(self, serializer):
-        """Save during update"""
-        serializer.save()
+    @action(detail=False, methods=['post'])
+    def bulk_update_stock(self, request):
+        """
+        POST /api/food-menu/bulk_update_stock/ - Bulk update stock status
+        """
+        updates = request.data.get('updates', [])
+        results = []
+        
+        for update in updates:
+            try:
+                food_item = FoodItem.objects.get(food_id=update['food_id'])
+                food_item.stock_status = update['stock_status']
+                food_item.stock_notes = update.get('stock_notes', '')
+                food_item.save()
+                
+                results.append({
+                    'food_id': food_item.food_id,
+                    'food_name': food_item.food_name,
+                    'stock_status': food_item.stock_status,
+                    'is_available_now': food_item.is_available_now(),
+                    'success': True
+                })
+            except FoodItem.DoesNotExist:
+                results.append({
+                    'food_id': update['food_id'],
+                    'success': False,
+                    'error': 'Food item not found'
+                })
+            except Exception as e:
+                results.append({
+                    'food_id': update['food_id'],
+                    'success': False,
+                    'error': str(e)
+                })
+        
+        return Response({'results': results})
 
-    def perform_destroy(self, instance):
-        """Soft delete implementation"""
-        instance.is_active = False
-        instance.save()
+    @action(detail=False, methods=['post'])
+    def apply_timing_stock(self, request):
+        """
+        POST /api/food-menu/apply_timing_stock/ - Apply timing-based stock
+        """
+        timing_type = request.data.get('timing_type')  # 'morning', 'lunch', 'dinner', 'all'
+        
+        food_items = FoodItem.objects.filter(auto_manage_stock=True, is_active=True)
+        updated_count = 0
+        
+        for item in food_items:
+            original_status = item.stock_status
+            
+            if timing_type == 'all':
+                item.stock_status = 'in_stock'
+            elif timing_type == 'morning':
+                # Only tiffin items available in morning
+                item.stock_status = 'in_stock' if item.subcategory == 'tiffin' else 'out_of_stock'
+            elif timing_type == 'lunch':
+                # Only lunch items available
+                item.stock_status = 'in_stock' if item.subcategory == 'lunch' else 'out_of_stock'
+            elif timing_type == 'dinner':
+                # Dinner items + specific tiffin items available
+                is_dinner_item = (
+                    item.subcategory == 'dinner' or
+                    (item.subcategory == 'tiffin' and any(keyword in item.food_name.lower() for keyword in ['idly', 'dosa', 'pongal'])) or
+                    (item.subcategory == 'lunch' and any(keyword in item.food_name.lower() for keyword in ['biryani', 'fried rice', 'noodles']))
+                )
+                item.stock_status = 'in_stock' if is_dinner_item else 'out_of_stock'
+            else:
+                continue
+            
+            if item.stock_status != original_status:
+                item.save()
+                updated_count += 1
+        
+        return Response({
+            'message': f'{timing_type} timing applied successfully',
+            'updated_count': updated_count,
+            'total_items': len(food_items)
+        })
 
-    # Custom Actions
     @action(detail=False, methods=['get'])
-    def all_items(self, request):
+    def stock_summary(self, request):
         """
-        GET /api/food-menu/all_items/ - Get all items including inactive
+        GET /api/food-menu/stock_summary/ - Get stock statistics
         """
-        items = FoodItem.objects.all().order_by('category', 'food_name')
-        serializer = self.get_serializer(items, many=True)
+        total_items = FoodItem.objects.filter(is_active=True).count()
+        in_stock_count = FoodItem.objects.filter(stock_status='in_stock', is_active=True).count()
+        out_of_stock_count = FoodItem.objects.filter(stock_status='out_of_stock', is_active=True).count()
+        
+        # Count by subcategory
+        subcategory_stats = {}
+        for item in FoodItem.objects.filter(is_active=True):
+            subcat = item.subcategory or 'Uncategorized'
+            if subcat not in subcategory_stats:
+                subcategory_stats[subcat] = {'total': 0, 'in_stock': 0}
+            subcategory_stats[subcat]['total'] += 1
+            if item.stock_status == 'in_stock':
+                subcategory_stats[subcat]['in_stock'] += 1
+        
+        return Response({
+            'total_items': total_items,
+            'in_stock_count': in_stock_count,
+            'out_of_stock_count': out_of_stock_count,
+            'availability_rate': round((in_stock_count / total_items) * 100, 2) if total_items > 0 else 0,
+            'subcategory_stats': subcategory_stats
+        })
+
+    # ────── TIMING MANAGEMENT ACTIONS ──────
+    @action(detail=True, methods=['post'])
+    def update_timing(self, request, pk=None):
+        """
+        POST /api/food-menu/{id}/update_timing/ - Update food item timing
+        """
+        food_item = self.get_object()
+        start_time = request.data.get('start_time')
+        end_time = request.data.get('end_time')
+        is_timing_active = request.data.get('is_timing_active', False)
+        
+        food_item.start_time = start_time
+        food_item.end_time = end_time
+        food_item.is_timing_active = is_timing_active
+        food_item.save()
+        
+        return Response({
+            'message': f'{food_item.food_name} timing updated successfully',
+            'timing_display': food_item.timing_display,
+            'is_available_now': food_item.is_available_now()
+        })
+
+    @action(detail=False, methods=['get'])
+    def available_items(self, request):
+        """
+        GET /api/food-menu/available_items/ - Get only available items
+        """
+        available_items = [item for item in FoodItem.objects.filter(is_active=True) if item.is_available_now()]
+        serializer = self.get_serializer(available_items, many=True)
         return Response(serializer.data)
 
+    # ────── EXISTING CUSTOM ACTIONS ──────
     @action(detail=False, methods=['get'])
     def categories(self, request):
         """
@@ -287,7 +387,7 @@ class FoodItemViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def subcategories(self, request):
         """
-        GET /api/food-menu/subcategories/ - Get all available subcategories
+        GET /api/food-menu/subcategories/ - Get all available subcategories from FoodItems
         """
         subcategories = FoodItem.objects.filter(is_active=True)\
             .exclude(subcategory__isnull=True)\
@@ -296,44 +396,66 @@ class FoodItemViewSet(viewsets.ModelViewSet):
             .distinct()
         return Response(list(subcategories))
 
-    @action(detail=False, methods=['get'])
-    def by_category(self, request):
-        """
-        GET /api/food-menu/by_category/?category=food - Filter by category
-        """
-        category = request.query_params.get('category')
-        if not category:
+
+class SubCategoryViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing subcategories with timing
+    """
+    queryset = SubCategory.objects.all().order_by('subcategory_name')
+    serializer_class = SubCategorySerializer
+    permission_classes = [permissions.AllowAny]
+    
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        # Check if subcategory is being used in any food items
+        if FoodItem.objects.filter(subcategory=instance.subcategory_name).exists():
             return Response(
-                {"error": "Category parameter is required"}, 
+                {
+                    "error": f"Cannot delete subcategory '{instance.subcategory_name}'. It is being used in food items."
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # ────── TIMING MANAGEMENT ACTIONS ──────
+    @action(detail=True, methods=['post'])
+    def update_timing(self, request, pk=None):
+        """
+        POST /api/subcategories/{id}/update_timing/ - Update subcategory timing
+        """
+        subcategory = self.get_object()
+        start_time = request.data.get('start_time')
+        end_time = request.data.get('end_time')
+        is_timing_active = request.data.get('is_timing_active', False)
         
-        items = FoodItem.objects.filter(
-            is_active=True, 
-            category=category
-        ).order_by('food_name')
-        serializer = self.get_serializer(items, many=True)
-        return Response(serializer.data)
+        subcategory.start_time = start_time
+        subcategory.end_time = end_time
+        subcategory.is_timing_active = is_timing_active
+        subcategory.save()
+        
+        return Response({
+            'message': f'{subcategory.subcategory_name} timing updated successfully',
+            'timing_display': subcategory.timing_display,
+            'is_available_now': subcategory.is_available_now()
+        })
 
     @action(detail=False, methods=['get'])
-    def by_subcategory(self, request):
+    def available(self, request):
         """
-        GET /api/food-menu/by_subcategory/?subcategory=lunch - Filter by subcategory
+        GET /api/subcategories/available/ - Get subcategories not used in food items
         """
-        subcategory = request.query_params.get('subcategory')
-        if not subcategory:
-            return Response(
-                {"error": "Subcategory parameter is required"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        used_subcategories = FoodItem.objects.filter(is_active=True)\
+            .exclude(subcategory__isnull=True)\
+            .exclude(subcategory='')\
+            .values_list('subcategory', flat=True)\
+            .distinct()
         
-        items = FoodItem.objects.filter(
-            is_active=True, 
-            subcategory=subcategory
-        ).order_by('food_name')
-        serializer = self.get_serializer(items, many=True)
+        available = SubCategory.objects.exclude(subcategory_name__in=used_subcategories)
+        serializer = self.get_serializer(available, many=True)
         return Response(serializer.data)
 
+        
 class RestaurantTableViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing restaurant tables
@@ -346,3 +468,5 @@ class RestaurantTableViewSet(viewsets.ModelViewSet):
         """Soft delete implementation"""
         instance.is_active = False
         instance.save()        
+
+      

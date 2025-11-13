@@ -1,37 +1,44 @@
 # backend/management/serializers.py
 from rest_framework import serializers
-from .models import FoodItem,RestaurantTable
+from .models import FoodItem,RestaurantTable,SubCategory
+
+class SubCategorySerializer(serializers.ModelSerializer):
+    timing_display = serializers.ReadOnlyField()
+    has_timing = serializers.ReadOnlyField()
+    is_available_now = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = SubCategory
+        fields = [
+            'subcategory_id', 'subcategory_name', 
+            'start_time', 'end_time', 'is_timing_active',
+            'timing_display', 'has_timing', 'is_available_now',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['subcategory_id', 'created_at', 'updated_at']
 
 class FoodItemSerializer(serializers.ModelSerializer):
-    # Remove these read-only fields for input
-    # category = serializers.CharField(source='get_category_display', read_only=True)
-    # subcategory = serializers.CharField(source='get_subcategory_display', read_only=True)
-    # food_type = serializers.CharField(source='get_food_type_display', read_only=True)
+    subcategory_display = serializers.CharField(source='subcategory', read_only=True)
+    timing_display = serializers.ReadOnlyField()
+    has_timing = serializers.ReadOnlyField()
+    is_available_now = serializers.ReadOnlyField()
+    availability_status = serializers.ReadOnlyField()
     
-    # Keep only the display fields as read-only (optional, for output only)
-    category_display = serializers.CharField(source='get_category_display', read_only=True)
-    subcategory_display = serializers.CharField(source='get_subcategory_display', read_only=True)
-    food_type_display = serializers.CharField(source='get_food_type_display', read_only=True)
-    
-    image_url = serializers.SerializerMethodField()
-
     class Meta:
         model = FoodItem
         fields = [
-            'food_id',
-            'category', 'subcategory', 'food_type',  # These are for input
-            'category_display', 'subcategory_display', 'food_type_display',  # These are for display
-            'food_name', 'price', 'description',
-            'image', 'image_url',
+            'food_id', 'category', 'subcategory', 'subcategory_display',
+            'food_type', 'food_name', 'price', 'description', 'image',
+            'stock_status', 'auto_manage_stock', 'stock_notes', 'last_stock_update',
+            'start_time', 'end_time', 'is_timing_active',
+            'timing_display', 'has_timing', 'is_available_now', 'availability_status',
             'is_active', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['food_id', 'created_at', 'updated_at', 'image_url']
-
-    def get_image_url(self, obj):
-        if obj.image:
-            return obj.image.url  # Cloudinary full URL
-        return None
-
+        read_only_fields = [
+            'food_id', 'created_at', 'updated_at', 'last_stock_update',
+            'timing_display', 'has_timing', 'is_available_now', 'availability_status'
+        ]
+        
 class RestaurantTableSerializer(serializers.ModelSerializer):
     class Meta:
         model = RestaurantTable
@@ -50,4 +57,7 @@ class RestaurantTableSerializer(serializers.ModelSerializer):
             if self.instance and self.instance.table_number == value:
                 return value
             raise serializers.ValidationError("Table number already exists")
-        return value        
+        return value
+
+
+              
