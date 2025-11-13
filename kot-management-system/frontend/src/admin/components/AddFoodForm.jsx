@@ -1,5 +1,5 @@
 // src/components/AddFoodForm.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import API from "../../api";
 
 const AddFoodForm = ({ onSuccess, onCancel }) => {
@@ -12,6 +12,8 @@ const AddFoodForm = ({ onSuccess, onCancel }) => {
     description: "",
     image: null,
   });
+  const [subcategories, setSubcategories] = useState([]);
+  const [loadingSubcategories, setLoadingSubcategories] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -19,6 +21,26 @@ const AddFoodForm = ({ onSuccess, onCancel }) => {
   const CLOUDINARY_CLOUD_NAME = "dkq48nzr3";
   const CLOUDINARY_UPLOAD_PRESET = "kot-menu-preset";
   const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+  // Fetch subcategories from API
+  useEffect(() => {
+    const fetchSubcategories = async () => {
+      try {
+        setLoadingSubcategories(true);
+        const response = await API.get("subcategories/");
+        setSubcategories(response.data);
+      } catch (error) {
+        console.error("Failed to fetch subcategories:", error);
+        setMessage("Failed to load subcategories");
+        // Fallback to empty array
+        setSubcategories([]);
+      } finally {
+        setLoadingSubcategories(false);
+      }
+    };
+
+    fetchSubcategories();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
@@ -106,7 +128,6 @@ const AddFoodForm = ({ onSuccess, onCancel }) => {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* All your existing form fields remain the same */}
         {/* Category */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
@@ -121,24 +142,39 @@ const AddFoodForm = ({ onSuccess, onCancel }) => {
           </select>
         </div>
 
-        {/* Subcategory */}
+        {/* Subcategory - DYNAMIC FROM API */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Subcategory</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Subcategory
+            {loadingSubcategories && (
+              <span className="ml-2 text-xs text-gray-500">(Loading...)</span>
+            )}
+          </label>
           <select
             name="subcategory"
             value={form.subcategory}
             onChange={handleChange}
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+            disabled={loadingSubcategories}
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition disabled:bg-gray-100 disabled:cursor-not-allowed"
           >
-            <option value="">-- Select --</option>
-            <option value="tiffin">Tiffin</option>
-            <option value="lunch">Lunch</option>
-            <option value="dinner">Dinner</option>
-            <option value="breakfast">Breakfast</option>
-            <option value="snacks">Snacks</option>
-            <option value="beverages">Beverages</option>
-            <option value="desserts">Desserts</option>
+            <option value="">-- Select Subcategory --</option>
+            {subcategories.map((subcat) => (
+              <option 
+                key={subcat.subcategory_id} 
+                value={subcat.subcategory_name}
+              >
+                {subcat.subcategory_name}
+              </option>
+            ))}
+            {subcategories.length === 0 && !loadingSubcategories && (
+              <option value="" disabled>No subcategories available</option>
+            )}
           </select>
+          {subcategories.length === 0 && !loadingSubcategories && (
+            <p className="mt-1 text-xs text-amber-600">
+              No subcategories found. Please create some in the "Manage Subcategories" section first.
+            </p>
+          )}
         </div>
 
         {/* Food Type */}
@@ -221,14 +257,19 @@ const AddFoodForm = ({ onSuccess, onCancel }) => {
         </button>
         <button
           type="submit"
-          disabled={uploading}
+          disabled={uploading || loadingSubcategories}
           className={`flex-1 py-3 rounded-xl font-semibold text-white transition transform ${
-            uploading
+            uploading || loadingSubcategories
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-xl active:scale-95"
           }`}
         >
-          {uploading ? "Uploading & Saving..." : "Add Food Item"}
+          {uploading 
+            ? "Uploading & Saving..." 
+            : loadingSubcategories
+            ? "Loading Subcategories..."
+            : "Add Food Item"
+          }
         </button>
       </div>
 

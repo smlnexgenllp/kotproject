@@ -4,46 +4,56 @@ import API from "../../api";
 
 const EditFoodForm = ({ food, onSuccess, onCancel }) => {
   const [form, setForm] = useState({
-    category: "food",
-    subcategory: "",
-    food_type: "veg",
-    food_name: "",
-    price: "",
-    description: "",
+    category: food?.category || "food",
+    subcategory: food?.subcategory || "",
+    food_type: food?.food_type || "veg",
+    food_name: food?.food_name || "",
+    price: food?.price || "",
+    description: food?.description || "",
     image: null,
   });
-  const [currentImage, setCurrentImage] = useState("");
+  const [subcategories, setSubcategories] = useState([]);
+  const [loadingSubcategories, setLoadingSubcategories] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  // CLOUDINARY Configuration
+  // CLOUDINARY (Unsigned Upload)
   const CLOUDINARY_CLOUD_NAME = "dkq48nzr3";
   const CLOUDINARY_UPLOAD_PRESET = "kot-menu-preset";
   const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
-  // Fix image URL
-  const getImageUrl = (imageUrl) => {
-    if (!imageUrl) return null;
-    if (imageUrl.includes('image/upload/image/upload')) {
-      return imageUrl.replace('image/upload/image/upload', 'image/upload');
-    }
-    return imageUrl;
-  };
+  // Fetch subcategories from API
+  useEffect(() => {
+    const fetchSubcategories = async () => {
+      try {
+        setLoadingSubcategories(true);
+        const response = await API.get("subcategories/");
+        setSubcategories(response.data);
+      } catch (error) {
+        console.error("Failed to fetch subcategories:", error);
+        setMessage("Failed to load subcategories");
+        // Fallback to empty array
+        setSubcategories([]);
+      } finally {
+        setLoadingSubcategories(false);
+      }
+    };
 
-  // Load food data when component mounts or food prop changes
+    fetchSubcategories();
+  }, []);
+
+  // Update form when food prop changes
   useEffect(() => {
     if (food) {
       setForm({
-        category: food.category,
+        category: food.category || "food",
         subcategory: food.subcategory || "",
-        food_type: food.food_type,
-        food_name: food.food_name,
-        price: food.price,
+        food_type: food.food_type || "veg",
+        food_name: food.food_name || "",
+        price: food.price || "",
         description: food.description || "",
         image: null,
       });
-      setCurrentImage(getImageUrl(food.image) || "");
     }
   }, [food]);
 
@@ -76,7 +86,7 @@ const EditFoodForm = ({ food, onSuccess, onCancel }) => {
     setUploading(true);
 
     try {
-      let imageUrl = currentImage;
+      let imageUrl = food?.image || ""; // Keep existing image if no new one uploaded
       if (form.image) {
         imageUrl = await uploadToCloudinary(form.image);
       }
@@ -88,7 +98,7 @@ const EditFoodForm = ({ food, onSuccess, onCancel }) => {
         food_name: form.food_name.trim(),
         price: parseFloat(form.price),
         description: form.description?.trim() || null,
-        image: imageUrl || null,
+        image: imageUrl,
       };
 
       await API.put(`food-menu/${food.food_id}/`, payload, {
@@ -98,8 +108,8 @@ const EditFoodForm = ({ food, onSuccess, onCancel }) => {
       });
 
       setMessage("Food item updated successfully!");
-      
-      // Call success callback after delay
+
+      // Call success callback
       setTimeout(() => {
         if (onSuccess) {
           onSuccess();
@@ -135,24 +145,39 @@ const EditFoodForm = ({ food, onSuccess, onCancel }) => {
           </select>
         </div>
 
-        {/* Subcategory */}
+        {/* Subcategory - DYNAMIC FROM API */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Subcategory</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Subcategory
+            {loadingSubcategories && (
+              <span className="ml-2 text-xs text-gray-500">(Loading...)</span>
+            )}
+          </label>
           <select
             name="subcategory"
             value={form.subcategory}
             onChange={handleChange}
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+            disabled={loadingSubcategories}
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition disabled:bg-gray-100 disabled:cursor-not-allowed"
           >
-            <option value="">-- Select --</option>
-            <option value="tiffin">Tiffin</option>
-            <option value="lunch">Lunch</option>
-            <option value="dinner">Dinner</option>
-            <option value="breakfast">Breakfast</option>
-            <option value="snacks">Snacks</option>
-            <option value="beverages">Beverages</option>
-            <option value="desserts">Desserts</option>
+            <option value="">-- Select Subcategory --</option>
+            {subcategories.map((subcat) => (
+              <option 
+                key={subcat.subcategory_id} 
+                value={subcat.subcategory_name}
+              >
+                {subcat.subcategory_name}
+              </option>
+            ))}
+            {subcategories.length === 0 && !loadingSubcategories && (
+              <option value="" disabled>No subcategories available</option>
+            )}
           </select>
+          {subcategories.length === 0 && !loadingSubcategories && (
+            <p className="mt-1 text-xs text-amber-600">
+              No subcategories found. Please create some in the "Manage Subcategories" section first.
+            </p>
+          )}
         </div>
 
         {/* Food Type */}
@@ -200,24 +225,27 @@ const EditFoodForm = ({ food, onSuccess, onCancel }) => {
 
         {/* Image */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Image</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Image
+            {food?.image && (
+              <span className="ml-2 text-xs text-green-600">(Current image will be kept if no new file selected)</span>
+            )}
+          </label>
           <input
+            id="image"
             type="file"
             name="image"
             accept="image/*"
             onChange={handleChange}
             className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
           />
-          {currentImage && (
+          {food?.image && !form.image && (
             <div className="mt-2">
-              <p className="text-sm text-gray-600 mb-1">Current Image:</p>
+              <p className="text-xs text-gray-500 mb-1">Current Image:</p>
               <img 
-                src={currentImage} 
-                alt="Current" 
-                className="h-20 w-20 object-cover rounded-lg"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                }}
+                src={food.image} 
+                alt={food.food_name}
+                className="h-20 w-20 rounded-lg object-cover border border-gray-200"
               />
             </div>
           )}
@@ -247,14 +275,19 @@ const EditFoodForm = ({ food, onSuccess, onCancel }) => {
         </button>
         <button
           type="submit"
-          disabled={uploading}
+          disabled={uploading || loadingSubcategories}
           className={`flex-1 py-3 rounded-xl font-semibold text-white transition transform ${
-            uploading
+            uploading || loadingSubcategories
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-xl active:scale-95"
           }`}
         >
-          {uploading ? "Updating..." : "Update Food Item"}
+          {uploading 
+            ? "Uploading & Saving..." 
+            : loadingSubcategories
+            ? "Loading Subcategories..."
+            : "Update Food Item"
+          }
         </button>
       </div>
 
