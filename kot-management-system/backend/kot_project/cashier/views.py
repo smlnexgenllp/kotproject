@@ -49,6 +49,7 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
                 OrderItem(
                     order=order,
                     name=item['name'],
+                    food_id=item.get('food_id'),
                     quantity=item['quantity'],
                     price=item['price']
                 )

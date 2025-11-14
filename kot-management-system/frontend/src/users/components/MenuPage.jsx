@@ -9,6 +9,8 @@ import {
 import axios from "axios";
 
 const API_URL = "http://127.0.0.1:8000/api/food-menu/";
+const TABLES_API = "http://127.0.0.1:8000/api/tables/";  // <-- NEW
+const CASHIER_API = "http://127.0.0.1:8000/api/orders/create_order/";
 
 export default function MenuPage() {
   const navigate = useNavigate();
@@ -22,38 +24,48 @@ export default function MenuPage() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+ const [availableTables, setAvailableTables] = useState([]); 
+ const [paymentMode, setPaymentMode] = useState("cash");
+ const [receivedAmount, setReceivedAmount] = useState(0);  
+const [balanceAmount, setBalanceAmount] = useState(0);
+
 
   useEffect(() => {
-    const fetchMenu = async () => {
-      try {
-        setLoading(true);
-        const [itemsRes, catsRes] = await Promise.all([
-          axios.get(API_URL),
-          axios.get(API_URL + "categories/"),
-        ]);
-      
-        const items = itemsRes.data.map((item) => ({
-          id: item.id,
-          name: item.food_name,
-          price: item.price,
-          category: item.category.toLowerCase(),
-          image: item.image || null,
-          food_type: item.food_type || "veg", 
-          original_price: item.original_price || null
-        }));
+  const fetchMenu = async () => {
+    try {
+      setLoading(true);
 
-        const cats = catsRes.data.map((c) => c.toLowerCase());
-        setMenuItems(items);
-        setCategories(["all", ...cats]);
-      } catch (err) {
-        setError("Failed to load menu");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchMenu();
-  }, []);
+      // 3 CALLS → 3 RESULTS
+      const [itemsRes, catsRes, tablesRes] = await Promise.all([
+        axios.get(API_URL),
+        axios.get(API_URL + "categories/"),
+        axios.get(TABLES_API),
+      ]);
 
+      const items = itemsRes.data.map((item) => ({
+        id: item.food_id,
+        name: item.food_name,
+        price: parseFloat(item.price),  // CLEAN PRICE
+        category: item.category.toLowerCase(),
+        image: item.image || null,
+        food_type: item.food_type || "veg",
+        original_price: item.original_price || null,
+      }));
+
+      const cats = catsRes.data.map((c) => c.toLowerCase());
+      setMenuItems(items);
+      setCategories(["all", ...cats]);
+      setAvailableTables(tablesRes.data);  // NOW WORKS
+    } catch (err) {
+      console.error("Fetch error:", err);
+      setError("Failed to load menu. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchMenu();
+}, []); // RUN ONCE
   const filtered = useMemo(() => {
     return menuItems.filter((i) => {
       const matchesSearch = i.name.toLowerCase().includes(search.toLowerCase());
@@ -89,11 +101,46 @@ const updateQty = (id, delta) => {
   const total = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const itemCount = cart.reduce((sum, i) => sum + i.quantity, 0);
 
-  const handleProceed = () => {
-    if (!tableNumber.trim()) return alert("Enter Table No.");
-    if (cart.length === 0) return alert("Cart is empty!");
-    navigate("/payment", { state: { tableNumber, cart, total } });
+  const handleProceed = async () => {
+  if (!tableNumber) return alert("Please select a Table No.");
+  if (cart.length === 0) return alert("Cart is empty!");
+
+  const payload = {
+    tableNumber: tableNumber,
+    total: total,
+    paymentMode: paymentMode,
+    received_amount: receivedAmount,
+    balance_amount: balanceAmount,
+    cart: cart.map(item => ({
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+      food_id: item.id
+    }))
   };
+
+  console.log("Sending order:", payload);
+
+  try {
+    const res = await axios.post(CASHIER_API, payload, {
+      headers: { "Content-Type": "application/json" },
+    });
+
+    navigate("/cashier", {
+      state: {
+        order_id: res.data.order_id,
+        tableNumber,
+        total: res.data.total_amount,
+        items: res.data.items,
+      },
+    });
+  } catch (err) {
+    const msg = err.response?.data?.detail || err.message;
+    alert("Order failed: " + msg);
+  }
+};
+
+ 
 
   if (loading) return (
     <div className="min-h-screen bg-blue-50 flex items-center justify-center">
@@ -131,15 +178,21 @@ const updateQty = (id, delta) => {
           </button>
         </div>
 
-        <div className="max-w-3xl mx-auto px-4 pb-4">
-          <input
-            type="number"
-            placeholder="Table No."
-            value={tableNumber}
-            onChange={(e) => setTableNumber(e.target.value)}
-            className="w-full px-6 py-4 text-2xl font-bold text-center rounded-2xl border-4 border-white focus:border-yellow-400 outline-none bg-white/90 backdrop-blur"
-          />
-        </div>
+       <div className="max-w-3xl mx-auto px-4 pb-4">
+  <select
+    value={tableNumber}
+    onChange={(e) => setTableNumber(e.target.value)}
+    className="w-full px-6 py-4 text-2xl font-bold text-center rounded-2xl border-4 border-white focus:border-yellow-400 outline-none bg-white/90"
+  >
+    <option value="">Select Table</option>
+    {availableTables.map((t) => (
+      <option key={t.table_id} value={t.table_number}>
+        {t.table_number}
+      </option>
+    ))}
+  </select>
+</div>
+        
       </header>
 
       {/* SEARCH */}

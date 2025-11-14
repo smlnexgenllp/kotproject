@@ -41,11 +41,12 @@ export default function CashierPortal() {
         <hr>
         ${order.items
           .map(
-            (item) => `
+            (item) => `<>
+            <h4>${item.name}-${item.food_id}</h4>
           <div style="display:flex;justify-content:space-between">
             <span>${item.quantity}x ${item.name}</span>
             <span>₹${item.price * item.quantity}</span>
-          </div>
+          </div></>
         `
           )
           .join("")}
