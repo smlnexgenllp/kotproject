@@ -149,9 +149,16 @@ class LoginView(APIView):
         if not user.is_verified:
             return Response({"error": "Please verify your email first"}, status=403)
 
+        # Authenticate user
         user = authenticate(username=user.username, password=password)
         if not user:
             return Response({"error": "Invalid credentials"}, status=400)
+
+        # ✅ NEW: Check if user has admin role
+        if user.role != 'admin':
+            return Response({
+                "error": "Access denied. Admin privileges required."
+            }, status=403)
 
         refresh = RefreshToken.for_user(user)
         return Response({
@@ -159,12 +166,11 @@ class LoginView(APIView):
             "user": {
                 "username": user.username,
                 "email": user.email,
-                "role": user.role
+                "role": user.role  # This will be 'admin'
             },
             "access": str(refresh.access_token),
             "refresh": str(refresh),
         }, status=200)
-
 
 class FoodItemViewSet(viewsets.ModelViewSet):
     """
@@ -455,7 +461,7 @@ class SubCategoryViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(available, many=True)
         return Response(serializer.data)
 
-        
+
 class RestaurantTableViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing restaurant tables
