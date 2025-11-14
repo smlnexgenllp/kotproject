@@ -1,3 +1,4 @@
+// src/components/Login.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../../api";
@@ -22,19 +23,34 @@ const Login = () => {
         password: form.password,
       });
 
-      // ✅ NEW: Check if user role is admin before proceeding
-      if (res.data.user.role === 'admin') {
-        localStorage.setItem("access_token", res.data.access);
-        localStorage.setItem("refresh_token", res.data.refresh);
-        localStorage.setItem("user", JSON.stringify(res.data.user));
+      const { user, access, refresh } = res.data;
 
-        setMessage("Admin login successful! Redirecting...");
-        setTimeout(() => navigate("/dashboard"), 1500);
-      } else {
-        setMessage("Access denied. Admin privileges required.");
-      }
+      // Save tokens & user data
+      localStorage.setItem("access_token", access);
+      localStorage.setItem("refresh_token", refresh);
+      localStorage.setItem("user", JSON.stringify(user));
+
+      setMessage("Login successful! Redirecting...");
+
+      // ROLE-BASED REDIRECT
+      setTimeout(() => {
+        switch (user.role) {
+          case "admin":
+            navigate("/dashboard");
+            break;
+          case "cashier":
+            navigate("/cashier");
+            break;
+          case "waiter":
+            navigate("/menu");
+            break;
+          default:
+            navigate("/"); // fallback
+        }
+      }, 800);
+
     } catch (err) {
-      setMessage(err.response?.data?.error || "Invalid credentials");
+      setMessage(err.response?.data?.error || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -52,11 +68,9 @@ const Login = () => {
           </svg>
         </div>
 
-        {/* Title */}
-        <h2 className="text-center text-3xl font-bold text-gray-800 mb-2">Admin Login</h2>
-        <p className="text-center text-gray-600 text-sm mb-8">Admin access required</p>
+        <h2 className="text-center text-3xl font-bold text-gray-800 mb-2">Welcome Back</h2>
+        <p className="text-center text-gray-600 text-sm mb-8">Login as Admin, Cashier or Waiter</p>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
           <input
             type="text"
@@ -87,18 +101,15 @@ const Login = () => {
                 : "bg-gradient-to-r from-purple-600 to-pink-600 hover:shadow-xl hover:scale-[0.98] active:scale-95"
             }`}
           >
-            {loading ? "Logging in..." : "Admin Login"}
+            {loading ? "Logging in..." : "Login"}
           </button>
         </form>
 
-        {/* Message */}
         {message && (
           <div
             className={`mt-5 p-3 rounded-lg text-center text-sm font-medium border animate-fadeIn ${
               message.includes("successful")
                 ? "bg-green-50 text-green-800 border-green-200"
-                : message.includes("Access denied")
-                ? "bg-orange-50 text-orange-800 border-orange-200"
                 : "bg-red-50 text-red-800 border-red-200"
             }`}
           >
@@ -106,7 +117,6 @@ const Login = () => {
           </div>
         )}
 
-        {/* Bottom Links - UPDATED */}
         <div className="mt-6 text-center text-sm text-gray-600">
           <p className="mb-3">Don't have an account?</p>
           <button

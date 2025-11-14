@@ -58,20 +58,24 @@ class SendEmailOTPView(APIView):
     def post(self, request):
         print("\n=== [OTP] POST /api/send-otp/ ===")
         print(f"Request data: {request.data}")
-        print(f"Request META (IP, User-Agent, etc.): {request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR'))}")
+        print(f"IP: {request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR'))}")
 
         email = request.data.get("email")
         if not email:
             print("Validation failed: No email provided")
-            return Response({"error": "Email is required"}, status=400)
+            return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        print(f"Requested email: {email}")
+        # Check if email already registered
         if AdminUser.objects.filter(email=email).exists():
             print(f"Email {email} is already registered")
-            return Response({"error": "Email already registered"}, status=400)
+            return Response({"error": "Email already registered"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Generate OTP
         otp = str(random.randint(100000, 999999))
         print(f"Generated OTP: {otp}")
+
         try:
+            # Save OTP to database
             obj, created = EmailOTP.objects.update_or_create(
                 email=email,
                 defaults={
@@ -80,28 +84,37 @@ class SendEmailOTPView(APIView):
                 },
             )
             print(f"OTP saved → created={created}, expires_at={obj.expires_at}")
+
         except Exception as db_err:
             print(f"Database error while saving OTP: {db_err}")
             logger.exception("DB error in SendEmailOTPView")
-            return Response({"error": "Failed to store OTP", "detail": str(db_err)}, status=500)
+            return Response(
+                {"error": "Failed to store OTP", "detail": str(db_err)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
+        # SUCCESS: Now send email
+        try:
             print("Attempting to send email via SMTP...")
             send_mail(
-                subject="Your KOT Email Verification OTP",
-                message=f"Your OTP is: {otp}\nValid for 10 minutes.",
-                from_email=None,               # Uses DEFAULT_FROM_EMAIL from settings
+                subject="Your KOT Verification OTP",
+                message=f"Your OTP is: {otp}\n\nValid for 10 minutes.\nDo not share it with anyone.",
+                from_email=None,  # Uses DEFAULT_FROM_EMAIL
                 recipient_list=[email],
                 fail_silently=False,
             )
             print("Email sent successfully!")
             logger.info(f"OTP email sent to {email} (OTP: {otp})")
-            return Response({"message": "OTP sent successfully"}, status=200)
+            return Response({"message": "OTP sent successfully"}, status=status.HTTP_200_OK)
 
         except Exception as mail_err:
             print(f"Email sending failed: {mail_err}")
             logger.exception(f"SMTP error for {email}")
+            # Optional: Delete OTP if email failed?
+            obj.delete()
             return Response(
-                {"error": "Failed to send email", "detail": str(mail_err)}, status=500
+                {"error": "Failed to send email", "detail": str(mail_err)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 class VerifyOTPView(APIView):
@@ -109,24 +122,24 @@ class VerifyOTPView(APIView):
         email = request.data.get('email')
         otp = request.data.get('otp')
 
+        if not email or not otp:
+            return Response({"error": "Email and OTP are required"}, status=400)
+
         try:
-            user = AdminUser.objects.get(email=email)
-            otp_obj = EmailOTP.objects.get(user=user)
-        except (AdminUser.DoesNotExist, EmailOTP.DoesNotExist):
-            return Response({"error": "Invalid email or OTP"}, status=400)
+            otp_obj = EmailOTP.objects.get(email=email)
+        except EmailOTP.DoesNotExist:
+            return Response({"error": "Invalid or expired OTP"}, status=400)
 
         if otp_obj.is_expired():
-            return Response({"error": "OTP expired"}, status=400)
+            otp_obj.delete()
+            return Response({"error": "OTP has expired"}, status=400)
+
         if otp_obj.otp != otp:
             return Response({"error": "Invalid OTP"}, status=400)
 
-        user.is_verified = True
-        user.is_active = True
-        user.save()
+        # OTP valid → delete it
         otp_obj.delete()
-
-        return Response({"message": "Email verified! You can now log in."}, status=200)
-
+        return Response({"message": "OTP verified successfully"}, status=200)
 
 
 class LoginView(APIView):
@@ -137,7 +150,7 @@ class LoginView(APIView):
         if not identifier or not password:
             return Response({"error": "Both fields are required"}, status=400)
 
-        # Try to find user by email or username
+        # Find user by email or username
         try:
             user = AdminUser.objects.get(email=identifier)
         except AdminUser.DoesNotExist:
@@ -149,29 +162,27 @@ class LoginView(APIView):
         if not user.is_verified:
             return Response({"error": "Please verify your email first"}, status=403)
 
-        # Authenticate user
+        # Authenticate
         user = authenticate(username=user.username, password=password)
         if not user:
             return Response({"error": "Invalid credentials"}, status=400)
 
-        # ✅ NEW: Check if user has admin role
-        if user.role != 'admin':
-            return Response({
-                "error": "Access denied. Admin privileges required."
-            }, status=403)
-
+        # Generate tokens
         refresh = RefreshToken.for_user(user)
+
         return Response({
             "message": "Login successful",
             "user": {
+                "id": user.id,
                 "username": user.username,
                 "email": user.email,
-                "role": user.role  # This will be 'admin'
+                "role": user.role,          # <-- IMPORTANT
             },
             "access": str(refresh.access_token),
             "refresh": str(refresh),
         }, status=200)
 
+        
 class FoodItemViewSet(viewsets.ModelViewSet):
     """
     DRF ViewSet for FoodItem model with stock and timing management
