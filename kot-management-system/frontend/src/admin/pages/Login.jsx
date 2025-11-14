@@ -22,12 +22,17 @@ const Login = () => {
         password: form.password,
       });
 
-      localStorage.setItem("access_token", res.data.access);
-      localStorage.setItem("refresh_token", res.data.refresh);
-      localStorage.setItem("user", JSON.stringify(res.data.user));
+      // ✅ NEW: Check if user role is admin before proceeding
+      if (res.data.user.role === 'admin') {
+        localStorage.setItem("access_token", res.data.access);
+        localStorage.setItem("refresh_token", res.data.refresh);
+        localStorage.setItem("user", JSON.stringify(res.data.user));
 
-      setMessage("Login successful! Redirecting...");
-      setTimeout(() => navigate("/dashboard"), 1500);
+        setMessage("Admin login successful! Redirecting...");
+        setTimeout(() => navigate("/dashboard"), 1500);
+      } else {
+        setMessage("Access denied. Admin privileges required.");
+      }
     } catch (err) {
       setMessage(err.response?.data?.error || "Invalid credentials");
     } finally {
@@ -48,8 +53,8 @@ const Login = () => {
         </div>
 
         {/* Title */}
-        <h2 className="text-center text-3xl font-bold text-gray-800 mb-2">Welcome Back</h2>
-        <p className="text-center text-gray-600 text-sm mb-8">Log in with your username or email</p>
+        <h2 className="text-center text-3xl font-bold text-gray-800 mb-2">Admin Login</h2>
+        <p className="text-center text-gray-600 text-sm mb-8">Admin access required</p>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -82,7 +87,7 @@ const Login = () => {
                 : "bg-gradient-to-r from-purple-600 to-pink-600 hover:shadow-xl hover:scale-[0.98] active:scale-95"
             }`}
           >
-            {loading ? "Logging in..." : "Log In"}
+            {loading ? "Logging in..." : "Admin Login"}
           </button>
         </form>
 
@@ -92,6 +97,8 @@ const Login = () => {
             className={`mt-5 p-3 rounded-lg text-center text-sm font-medium border animate-fadeIn ${
               message.includes("successful")
                 ? "bg-green-50 text-green-800 border-green-200"
+                : message.includes("Access denied")
+                ? "bg-orange-50 text-orange-800 border-orange-200"
                 : "bg-red-50 text-red-800 border-red-200"
             }`}
           >
@@ -99,20 +106,15 @@ const Login = () => {
           </div>
         )}
 
-        {/* Bottom Links */}
-        <div className="mt-6 text-center text-sm text-gray-600 space-x-3">
-          <span
+        {/* Bottom Links - UPDATED */}
+        <div className="mt-6 text-center text-sm text-gray-600">
+          <p className="mb-3">Don't have an account?</p>
+          <button
             onClick={() => navigate("/signup")}
-            className="text-purple-600 font-medium cursor-pointer hover:underline transition"
+            className="w-full py-3 rounded-xl font-medium text-purple-600 border-2 border-purple-600 hover:bg-purple-600 hover:text-white transition-all duration-300 transform hover:scale-[0.98] active:scale-95"
           >
-            Create an account
-          </span>
-          <span
-            onClick={() => navigate("/forgot-password")}
-            className="text-pink-600 font-medium cursor-pointer hover:underline transition"
-          >
-            Forgot password?
-          </span>
+            Sign Up
+          </button>
         </div>
       </div>
     </div>
