@@ -10,8 +10,8 @@ import axios from "axios";
 import Navbar from "./Navbar";
 
 const API_URL = "http://127.0.0.1:8000/api/food-menu/";
-const TABLES_API = "http://127.0.0.1:8000/api/tables/";  // <-- NEW
-const CASHIER_API = "http://127.0.0.1:8000/api/orders/create_order/";
+const TABLES_API = "http://127.0.0.1:8000/api/tables/";   // <-- NEW
+const CASHIER_API = "http://127.0.0.1:8000/api/cashier-orders/create_order/";
 
 export default function MenuPage() {
   const navigate = useNavigate();
@@ -28,6 +28,9 @@ export default function MenuPage() {
   const [error, setError] = useState("");
   const [user] = useState(JSON.parse(localStorage.getItem("user") || "{}"));
 
+  /* --------------------------------------------------------------
+     FETCH MENU + CATEGORIES (once on mount)
+     -------------------------------------------------------------- */
   useEffect(() => {
     const fetchMenu = async () => {
       try {
@@ -36,23 +39,23 @@ export default function MenuPage() {
           axios.get(API_URL),
           axios.get(API_URL + "categories/"),
         ]);
-      
-        const items = itemsRes.data.map((item) => ({
+
+        const items = itemsRes.data.map(item => ({
           id: item.id,
           food_id: item.id,
           name: item.food_name,
           price: item.price,
-          category: item.category?.toLowerCase() || "uncategorized",
+          category: (item.category?.toLowerCase() || "uncategorized"),
           image: item.image || null,
-          food_type: item.food_type || "veg", 
+          food_type: item.food_type || "veg",
           original_price: item.original_price || null,
           description: item.description || "",
           preparation_time: item.preparation_time || 15,
           stock_status: item.stock_status || "in_stock",
-          is_available_now: item.is_available_now !== false
+          is_available_now: item.is_available_now !== false,
         }));
 
-        const cats = catsRes.data.map((c) => c.toLowerCase());
+        const cats = catsRes.data.map(c => c.toLowerCase());
         setMenuItems(items);
         setCategories(["all", ...cats]);
       } catch (err) {
@@ -62,91 +65,83 @@ export default function MenuPage() {
         setLoading(false);
       }
     };
-    fetchMenu();
-  }, []);
 
-  fetchMenu();
-}, []); // RUN ONCE
+    fetchMenu();
+  }, []);   // <-- ONLY ONCE
+
+  /* --------------------------------------------------------------
+     FILTERED LIST (search + category)
+     -------------------------------------------------------------- */
   const filtered = useMemo(() => {
-    return menuItems.filter((i) => {
+    return menuItems.filter(i => {
       const matchesSearch = i.name.toLowerCase().includes(search.toLowerCase());
       const matchesCat = activeCat === "all" || i.category === activeCat;
       return matchesSearch && matchesCat;
     });
   }, [menuItems, search, activeCat]);
 
-  // Cart functionality
-  const addToCart = (item) => {
-    setCart((prev) => {
-      const existingItem = prev.find((c) => c.id === item.id);
-      if (existingItem) {
-        return prev.filter((c) =>
-          c.id !== item.id 
-        );
+  /* --------------------------------------------------------------
+     CART HELPERS
+     -------------------------------------------------------------- */
+  const addToCart = item => {
+    setCart(prev => {
+      const exists = prev.find(c => c.id === item.id);
+      if (exists) {
+        // toggle-off if already in cart
+        return prev.filter(c => c.id !== item.id);
       }
       return [...prev, { ...item, quantity: 1 }];
     });
   };
 
   const updateQuantity = (id, delta) => {
-    setCart((prev) =>
+    setCart(prev =>
       prev
-        .map((item) =>
-          item.id === id
-            ? { ...item, quantity: Math.max(0, item.quantity + delta) }
-            : item
-        )
-        .filter((item) => item.quantity > 0)
+        .map(i => (i.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i))
+        .filter(i => i.quantity > 0)
     );
   };
 
-  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const total = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const itemCount = cart.reduce((sum, i) => sum + i.quantity, 0);
+  const getCartQuantity = id => cart.find(i => i.id === id)?.quantity || 0;
 
-  // Get cart quantity for specific item
-  const getCartQuantity = (itemId) => {
-    const cartItem = cart.find(item => item.id === itemId);
-    return cartItem ? cartItem.quantity : 0;
+  /* --------------------------------------------------------------
+     IMAGE URL NORMALISER
+     -------------------------------------------------------------- */
+  const getImageUrl = item => {
+    if (!item.image) return null;
+    const img = item.image.trim();
+
+    if (img.startsWith("https://res.cloudinary.com")) return img;
+
+    if (img.includes("image/upload/https://res.cloudinary.com")) {
+      return img.substring(img.indexOf("https://res.cloudinary.com"));
+    }
+
+    if (img.startsWith("kot/")) {
+      return `https://res.cloudinary.com/dx0w3e13s/image/upload/w_300,h_200,c_fill/${img}`;
+    }
+
+    if (img.includes("cloudinary.com")) {
+      try {
+        const url = new URL(img);
+        const parts = url.pathname.split("/");
+        const idx = parts.indexOf("upload") + 1;
+        const publicId = parts.slice(idx).join("/");
+        return `https://res.cloudinary.com/dx0w3e13s/image/upload/w_300,h_200,c_fill/${publicId}`;
+      } catch {
+        console.warn("Bad Cloudinary URL:", img);
+        return null;
+      }
+    }
+
+    return null;
   };
 
-  const getImageUrl = (item) => {
-  if (!item.image) return null;
-
-  const img = item.image.trim();
-
-  // 1) Already correct, full Cloudinary URL
-  if (img.startsWith("https://res.cloudinary.com")) {
-    return img;
-  }
-
-  // 2) Broken format: "image/upload/https://res.cloudinary.com/...”
-  if (img.includes("image/upload/https://res.cloudinary.com")) {
-    const fixedUrl = img.substring(img.indexOf("https://res.cloudinary.com"));
-    return fixedUrl; // return the correct URL only
-  }
-
-  // 3) If it's only public_id (starts with kot/)
-  if (img.startsWith("kot/")) {
-    return `https://res.cloudinary.com/dx0w3e13s/image/upload/w_300,h_200,c_fill/${img}`;
-  }
-
-  // 4) A different cloudinary account
-  if (img.includes("cloudinary.com")) {
-    try {
-      const url = new URL(img);
-      const pathParts = url.pathname.split('/');
-      const publicId = pathParts.slice(pathParts.indexOf('upload') + 1).join('/');
-      return `https://res.cloudinary.com/dx0w3e13s/image/upload/w_300,h_200,c_fill/${publicId}`;
-    } catch {
-      console.warn("Failed to parse Cloudinary URL:", img);
-      return null;
-    }
-  }
-
-  // Unknown format
-  return null;
-};
-
+  /* --------------------------------------------------------------
+     CREATE ORDER (cashier endpoint)
+     -------------------------------------------------------------- */
   const handleProceed = async () => {
     if (!tableNumber.trim()) {
       setShowTableModal(true);
@@ -157,101 +152,86 @@ export default function MenuPage() {
       return;
     }
 
-    try {
-      const orderData = {
-        tableNumber: parseInt(tableNumber),
-        total: total,
-        cart: cart.map(item => ({
-          food_id: item.food_id,
-          name: item.name,
-          quantity: item.quantity,
-          price: item.price
-        })),
-        paymentMode: "cash"
-      };
+    const payload = {
+      tableNumber: parseInt(tableNumber, 10),
+      total,
+      paymentMode: "cash",
+      cart: cart.map(i => ({
+        food_id: i.food_id,
+        name: i.name,
+        quantity: i.quantity,
+        price: i.price,
+      })),
+    };
 
-      const response = await axios.post("http://127.0.0.1:8000/api/cashier-orders/create_order/", orderData);
-      
-      if (response.status === 201) {
-        navigate("/payment", { 
-          state: { 
-            tableNumber, 
-            cart, 
-            total,
-            orderId: response.data.order_id 
-          } 
-        });
-      }
-    } catch (error) {
-      console.error("Order creation failed:", error);
-      alert("Failed to create order. Please try again.");
+    try {
+      const res = await axios.post(CASHIER_API, payload, {
+        headers: { "Content-Type": "application/json" },
+      });
+
+      navigate("/payment", {
+        state: {
+          tableNumber,
+          cart,
+          total,
+          orderId: res.data.order_id,
+        },
+      });
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message;
+      alert("Order failed: " + msg);
+      console.error(err);
     }
   };
 
-  console.log("Sending order:", payload);
-
-  try {
-    const res = await axios.post(CASHIER_API, payload, {
-      headers: { "Content-Type": "application/json" },
-    });
-
-    navigate("/cashier", {
-      state: {
-        order_id: res.data.order_id,
-        tableNumber,
-        total: res.data.total_amount,
-        items: res.data.items,
-      },
-    });
-  } catch (err) {
-    const msg = err.response?.data?.detail || err.message;
-    alert("Order failed: " + msg);
+  /* --------------------------------------------------------------
+     RENDER
+     -------------------------------------------------------------- */
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            className="mx-auto mb-4"
+          >
+            <Coffee className="text-blue-600" size={64} />
+          </motion.div>
+          <p className="text-blue-900 font-semibold text-lg">Loading Menu...</p>
+        </div>
+      </div>
+    );
   }
-};
 
- 
-
-  if (loading) return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
-      <div className="text-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="mx-auto mb-4"
-        >
-          <Coffee className="text-blue-600" size={64} />
-        </motion.div>
-        <p className="text-blue-900 font-semibold text-lg">Loading Menu...</p>
+  if (error) {
+    return (
+      <div className="min-h-screen bg-red-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-red-700 text-xl font-bold">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
       </div>
-    </div>
-  );
-
-  if (error) return (
-    <div className="min-h-screen bg-red-50 flex items-center justify-center p-4">
-      <div className="text-center">
-        <p className="text-red-700 text-xl font-bold">{error}</p>
-        <button 
-          onClick={() => window.location.reload()} 
-          className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
-        >
-          Retry
-        </button>
-      </div>
-    </div>
-  );
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
-      {/* Navigation Bar with Table Option */}
-      <Navbar 
-        user={user} 
+      {/* NAVBAR */}
+      <Navbar
+        user={user}
         cartCount={itemCount}
         onShowCart={() => setShowCartModal(true)}
         tableNumber={tableNumber}
         onShowTable={() => setShowTableModal(true)}
       />
 
-      {/* Hero Section - More Compact */}
+      {/* HERO */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-6">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <motion.h1
@@ -272,10 +252,10 @@ export default function MenuPage() {
         </div>
       </div>
 
-      {/* Search & Categories - More Compact */}
+      {/* SEARCH + CATEGORIES */}
       <div className="max-w-7xl mx-auto px-4 mt-6">
         <div className="flex flex-col lg:flex-row gap-4 mb-6">
-          {/* Search Bar */}
+          {/* Search */}
           <div className="flex-1">
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-600" size={20} />
@@ -283,7 +263,7 @@ export default function MenuPage() {
                 type="text"
                 placeholder="Search food items..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={e => setSearch(e.target.value)}
                 className="w-full pl-12 pr-6 py-3 rounded-xl border-2 border-blue-200 focus:border-blue-500 outline-none text-base shadow-lg bg-white"
               />
             </div>
@@ -292,7 +272,7 @@ export default function MenuPage() {
           {/* Categories */}
           <div className="flex-1 overflow-x-auto">
             <div className="flex gap-2">
-              {categories.map((cat) => (
+              {categories.map(cat => (
                 <motion.button
                   key={cat}
                   whileHover={{ scale: 1.05 }}
@@ -311,80 +291,71 @@ export default function MenuPage() {
           </div>
         </div>
 
-        {/* Menu Grid - Compact Horizontal Cards */}
+        {/* MENU GRID */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-20">
-          {filtered.map((item, index) => {
-            const cartQuantity = getCartQuantity(item.id);
+          {filtered.map((item, idx) => {
+            const qty = getCartQuantity(item.id);
             const isVeg = item.food_type === "veg";
-            const isAvailable = item.is_available_now && item.stock_status === "in_stock";
-            
-            // FIXED: Use the improved image URL function
-            const imageUrl = getImageUrl(item);
-            const hasImage = imageUrl !== null;
+            const available = item.is_available_now && item.stock_status === "in_stock";
+            const imgUrl = getImageUrl(item);
+            const hasImg = imgUrl !== null;
 
             return (
               <motion.div
                 key={item.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
+                transition={{ duration: 0.3, delay: idx * 0.05 }}
                 className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 border border-gray-200 overflow-hidden group flex h-28"
               >
-                {/* Food Image - 30% width */}
+                {/* IMAGE */}
                 <div className="w-28 h-28 flex-shrink-0 relative overflow-hidden bg-gray-100">
-                  {hasImage ? (
+                  {hasImg ? (
                     <img
-                      src={imageUrl}
+                      src={imgUrl}
                       alt={item.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      onError={(e) => {
-                        console.log('Image failed to load:', imageUrl);
-                        e.target.style.display = 'none';
-                        e.target.nextSibling.style.display = 'flex';
+                      onError={e => {
+                        e.target.style.display = "none";
+                        e.target.nextSibling.style.display = "flex";
                       }}
                     />
                   ) : null}
-                  
-                  {/* Fallback when no image or image fails to load */}
-                  <div 
-                    className={`w-full h-full flex items-center justify-center ${hasImage ? 'hidden' : 'flex'}`}
-                  >
+                  <div className={`w-full h-full flex items-center justify-center ${hasImg ? "hidden" : "flex"}`}>
                     <div className="text-center">
                       <Image className="mx-auto text-gray-400 mb-1" size={20} />
                       <span className="text-xs text-gray-500 font-medium">No Image</span>
                     </div>
                   </div>
-                  
-                  {/* Government Style Veg/Non-Veg Icon */}
+
+                  {/* VEG/NON-VEG ICON */}
                   <div className="absolute top-1 left-1">
-                    <div className={`w-5 h-5 border-2 rounded-sm flex items-center justify-center ${
-                      isVeg ? 'border-green-600 bg-green-50' : 'border-red-600 bg-red-50'
-                    }`}>
-                      <div className={`w-2 h-2 rounded-full ${
-                        isVeg ? 'bg-green-600' : 'bg-red-600'
-                      }`} />
+                    <div
+                      className={`w-5 h-5 border-2 rounded-sm flex items-center justify-center ${
+                        isVeg ? "border-green-600 bg-green-50" : "border-red-600 bg-red-50"
+                      }`}
+                    >
+                      <div className={`w-2 h-2 rounded-full ${isVeg ? "bg-green-600" : "bg-red-600"}`} />
                     </div>
                   </div>
-                  
-                  {/* Stock Status Badge */}
-                  {!isAvailable && (
+
+                  {/* OUT OF STOCK */}
+                  {!available && (
                     <div className="absolute bottom-1 left-1 right-1 bg-red-600 text-white text-xs px-1 py-0.5 rounded text-center font-semibold">
                       Out of Stock
                     </div>
                   )}
                 </div>
 
-                {/* Food Details - 70% width */}
+                {/* DETAILS */}
                 <div className="flex-1 p-2 flex flex-col justify-between min-w-0">
-                  <div className="flex-1">
+                  <div>
                     <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2 mb-1">
                       {item.name}
                     </h3>
-                    <p className="text-gray-500 text-xs capitalize mb-1">
-                      {item.category}
-                    </p>
+                    <p className="text-gray-500 text-xs capitalize mb-1">{item.category}</p>
                   </div>
-                  
+
                   <div className="flex justify-between items-center">
                     <div className="min-w-0">
                       <span className="text-base font-bold text-gray-900">₹{item.price}</span>
@@ -395,15 +366,15 @@ export default function MenuPage() {
                       )}
                     </div>
 
-                    {/* Add to Cart Button - FIXED: Each card shows only its own quantity */}
-                    {!isAvailable ? (
+                    {/* ADD / QUANTITY */}
+                    {!available ? (
                       <div className="text-xs text-red-600 font-semibold px-2 py-1 bg-red-50 rounded border border-red-200">
                         Unavailable
                       </div>
-                    ) : cartQuantity > 0 ? (
+                    ) : qty > 0 ? (
                       <div className="flex items-center border border-green-500 rounded-lg overflow-hidden bg-green-50">
                         <button
-                          onClick={(e) => {
+                          onClick={e => {
                             e.stopPropagation();
                             updateQuantity(item.id, -1);
                           }}
@@ -412,10 +383,10 @@ export default function MenuPage() {
                           −
                         </button>
                         <span className="w-6 text-center font-bold text-green-700 text-xs flex items-center justify-center">
-                          {cartQuantity}
+                          {qty}
                         </span>
                         <button
-                          onClick={(e) => {
+                          onClick={e => {
                             e.stopPropagation();
                             updateQuantity(item.id, 1);
                           }}
@@ -428,7 +399,7 @@ export default function MenuPage() {
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={(e) => {
+                        onClick={e => {
                           e.stopPropagation();
                           addToCart(item);
                         }}
@@ -443,7 +414,7 @@ export default function MenuPage() {
             );
           })}
 
-          {/* No Items Found */}
+          {/* NO RESULTS */}
           {filtered.length === 0 && (
             <div className="col-span-full text-center py-12">
               <Search size={48} className="mx-auto text-gray-400 mb-4" />
@@ -454,7 +425,7 @@ export default function MenuPage() {
         </div>
       </div>
 
-      {/* Table Selection Modal */}
+      {/* TABLE MODAL */}
       <AnimatePresence>
         {showTableModal && (
           <motion.div
@@ -484,34 +455,30 @@ export default function MenuPage() {
                   type="number"
                   placeholder="Enter table number..."
                   value={tableNumber}
-                  onChange={(e) => setTableNumber(e.target.value)}
+                  onChange={e => setTableNumber(e.target.value)}
                   className="w-full px-4 py-3 text-lg text-center rounded-xl border-2 border-blue-200 focus:border-blue-500 outline-none bg-blue-50 font-bold"
                   min="1"
                   autoFocus
                 />
-                
-                <div className="grid grid-cols-2 gap-3">
-                  {[1, 2, 3, 4, 5, 6].map(num => (
+
+                <div className="grid grid-cols-3 gap-3">
+                  {[1, 2, 3, 4, 5, 6].map(n => (
                     <button
-                      key={num}
-                      onClick={() => setTableNumber(num.toString())}
+                      key={n}
+                      onClick={() => setTableNumber(n.toString())}
                       className={`py-2 rounded-lg font-semibold transition-all ${
-                        tableNumber === num.toString()
+                        tableNumber === n.toString()
                           ? "bg-blue-600 text-white shadow-lg"
                           : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                       }`}
                     >
-                      Table {num}
+                      Table {n}
                     </button>
                   ))}
                 </div>
 
                 <button
-                  onClick={() => {
-                    if (tableNumber.trim()) {
-                      setShowTableModal(false);
-                    }
-                  }}
+                  onClick={() => tableNumber.trim() && setShowTableModal(false)}
                   disabled={!tableNumber.trim()}
                   className={`w-full py-3 rounded-xl font-bold text-white transition-all ${
                     tableNumber.trim()
@@ -527,7 +494,7 @@ export default function MenuPage() {
         )}
       </AnimatePresence>
 
-      {/* Cart Modal */}
+      {/* CART MODAL */}
       <AnimatePresence>
         {showCartModal && (
           <motion.div
@@ -552,7 +519,7 @@ export default function MenuPage() {
                     {tableNumber ? `Table ${tableNumber}` : "No table selected"}
                   </p>
                 </div>
-                <button 
+                <button
                   onClick={() => setShowCartModal(false)}
                   className="p-1 hover:bg-blue-800 rounded-lg transition-colors"
                 >
@@ -560,7 +527,7 @@ export default function MenuPage() {
                 </button>
               </div>
 
-              {/* Cart Items */}
+              {/* Items */}
               <div className="max-h-64 overflow-y-auto p-4 space-y-3">
                 {cart.length === 0 ? (
                   <div className="text-center py-8">
@@ -584,7 +551,7 @@ export default function MenuPage() {
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1">
-                          <button 
+                          <button
                             onClick={() => updateQuantity(item.id, -1)}
                             className="w-6 h-6 rounded bg-white shadow hover:bg-gray-100 transition-colors font-bold text-xs"
                           >
@@ -593,7 +560,7 @@ export default function MenuPage() {
                           <span className="w-6 text-center font-bold text-gray-900 text-sm">
                             {item.quantity}
                           </span>
-                          <button 
+                          <button
                             onClick={() => updateQuantity(item.id, 1)}
                             className="w-6 h-6 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors font-bold text-xs"
                           >
