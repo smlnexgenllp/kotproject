@@ -14,6 +14,8 @@ from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from .serializers import FoodItemSerializer,RestaurantTableSerializer,SubCategorySerializer
+from cashier.models import Order, OrderItem
+from django.db.models import Q
 
 logger = logging.getLogger("otp_sender")
 
@@ -486,4 +488,115 @@ class RestaurantTableViewSet(viewsets.ModelViewSet):
         instance.is_active = False
         instance.save()        
 
-      
+class OrderHistoryViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Order.objects.select_related('table').prefetch_related('items').order_by('-created_at')
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        return Order.objects.select_related('table').prefetch_related('items').order_by('-created_at')
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        # ... your existing filter logic here ...
+        # (same as in download_csv)
+
+        orders = []
+        for order in qs:
+            orders.append({
+                "order_id": order.order_id,
+                "table_number": order.table_number,
+                "total_amount": str(order.total_amount),
+                "received_amount": str(order.received_amount),
+                "balance_amount": str(order.balance_amount),
+                "payment_mode": order.payment_mode,
+                "status": order.status,
+                "created_at": order.created_at.isoformat(),
+                "paid_at": order.paid_at.isoformat() if order.paid_at else None,
+                "items": [
+                    {
+                        "name": item.name,
+                        "quantity": item.quantity,
+                        "price": str(item.price),
+                        "subtotal": str(item.subtotal()),
+                    }
+                    for item in order.items.all()
+                ],
+            })
+        return Response({"orders": orders})
+
+    @action(detail=False, methods=['get'], url_path='download-csv')
+    def download_csv(self, request):
+        qs = self.get_queryset()
+
+        # === FILTERS ===
+        table_number = request.query_params.get('table_number')
+        status = request.query_params.get('status')
+        payment_mode = request.query_params.get('payment_mode')
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
+        search = request.query_params.get('search', '').strip()
+        today = request.query_params.get('today')
+        yesterday = request.query_params.get('yesterday')
+
+        if table_number:
+            try:
+                qs = qs.filter(table_number=int(table_number))
+            except ValueError:
+                pass
+        if status:
+            qs = qs.filter(status=status)
+        if payment_mode:
+            qs = qs.filter(payment_mode=payment_mode)
+        if date_from:
+            try:
+                from_dt = datetime.strptime(date_from, "%Y-%m-%d").date()
+                qs = qs.filter(created_at__date__gte=from_dt)
+            except ValueError:
+                pass
+        if date_to:
+            try:
+                to_dt = datetime.strptime(date_to, "%Y-%m-%d").date()
+                qs = qs.filter(created_at__date__lte=to_dt)
+            except ValueError:
+                pass
+        if search:
+            qs = qs.filter(
+                Q(order_id__icontains=search) |
+                Q(items__name__icontains=search)
+            ).distinct()
+
+        if today == '1':
+            qs = qs.filter(created_at__date=timezone.now().date())
+        elif yesterday == '1':
+            qs = qs.filter(created_at__date=timezone.now().date() - timedelta(days=1))
+
+        # === CSV ===
+        response = HttpResponse(content_type='text/csv')
+        filename = f"order_history_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'Order ID', 'Table', 'Items', 'Total (₹)', 'Received (₹)', 'Balance (₹)',
+            'Payment Mode', 'Status', 'Created At', 'Paid At'
+        ])
+
+        for order in qs.iterator():
+            items_str = '; '.join(
+                f"{item.quantity}x {item.name} @ ₹{item.price}"
+                for item in order.items.all()
+            )
+            writer.writerow([
+                order.order_id,
+                order.table_number,
+                items_str,
+                order.total_amount,
+                order.received_amount,
+                order.balance_amount,
+                order.payment_mode.capitalize(),
+                order.status.capitalize(),
+                order.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                order.paid_at.strftime('%Y-%m-%d %H:%M:%S') if order.paid_at else '-',
+            ])
+
+        return response

@@ -7,6 +7,7 @@ import FoodList from "./FoodList";
 import EditFoodForm from "./EditFoodForm";
 import TableList from "./TableList";
 import TimingManager from "../pages/Timingmanage";
+import OrderHistory from './OrderHistory';
 
 
 const Dashboard = () => {
@@ -96,8 +97,10 @@ const Dashboard = () => {
         return <AddFoodForm onBack={handleBackToFoodList} />;
       case "tables":
         return <TableList />;
-       case "timing-manager":
-         return <TimingManager />;  
+      case "timing-manager":
+        return <TimingManager />;
+      case "order-history":
+        return <OrderHistory />;
       case "edit-food":
         return <EditFoodForm foodId={editingFoodId} onBack={handleBackToFoodList} />;
       default:
@@ -148,8 +151,8 @@ const Dashboard = () => {
             <button
               onClick={() => handleSectionChange("dashboard")}
               className={`w-full flex items-center px-4 py-3 text-left font-medium rounded-lg transition ${activeSection === "dashboard"
-                  ? "text-indigo-600 bg-indigo-50 border-r-4 border-indigo-600"
-                  : "text-gray-700 hover:bg-gray-50"
+                ? "text-indigo-600 bg-indigo-50 border-r-4 border-indigo-600"
+                : "text-gray-700 hover:bg-gray-50"
                 }`}
             >
               <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -161,8 +164,8 @@ const Dashboard = () => {
             <button
               onClick={() => handleSectionChange("food-menu")}
               className={`w-full flex items-center px-4 py-3 text-left font-medium rounded-lg transition ${activeSection === "food-menu"
-                  ? "text-indigo-600 bg-indigo-50 border-r-4 border-indigo-600"
-                  : "text-gray-700 hover:bg-gray-50"
+                ? "text-indigo-600 bg-indigo-50 border-r-4 border-indigo-600"
+                : "text-gray-700 hover:bg-gray-50"
                 }`}
             >
               <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -174,8 +177,8 @@ const Dashboard = () => {
             <button
               onClick={() => handleSectionChange("tables")}
               className={`w-full flex items-center px-4 py-3 text-left font-medium rounded-lg transition ${activeSection === "tables"
-                  ? "text-indigo-600 bg-indigo-50 border-r-4 border-indigo-600"
-                  : "text-gray-700 hover:bg-gray-50"
+                ? "text-indigo-600 bg-indigo-50 border-r-4 border-indigo-600"
+                : "text-gray-700 hover:bg-gray-50"
                 }`}
             >
               <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -187,8 +190,8 @@ const Dashboard = () => {
             <button
               onClick={() => handleSectionChange("timing-manager")}
               className={`w-full flex items-center px-4 py-3 text-left font-medium rounded-lg transition ${activeSection === "timing-manager"
-                  ? "text-indigo-600 bg-indigo-50 border-r-4 border-indigo-600"
-                  : "text-gray-700 hover:bg-gray-50"
+                ? "text-indigo-600 bg-indigo-50 border-r-4 border-indigo-600"
+                : "text-gray-700 hover:bg-gray-50"
                 }`}
             >
               <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -196,7 +199,18 @@ const Dashboard = () => {
               </svg>
               Timing & Stock Manager
             </button>
-
+            <button
+              onClick={() => handleSectionChange("order-history")}
+              className={`w-full flex items-center px-4 py-3 text-left font-medium rounded-lg transition ${activeSection === "order-history"
+                ? "text-indigo-600 bg-indigo-50 border-r-4 border-indigo-600"
+                : "text-gray-700 hover:bg-gray-50"
+                }`}
+            >
+              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 110-4H5a2 2 0 110 4h14z" />
+              </svg>
+              Order History
+            </button>
 
           </nav>
 
@@ -359,8 +373,8 @@ const DashboardHome = ({ kots, user }) => {
                     </td>
                     <td className="py-2 lg:py-3 px-2 lg:px-4">
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${kot.status === 'pending'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-green-100 text-green-800'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-green-100 text-green-800'
                         }`}>
                         {kot.status}
                       </span>

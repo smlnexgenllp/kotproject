@@ -3,7 +3,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     RegisterView, VerifyOTPView, LoginView, SendEmailOTPView,
-    FoodItemViewSet,RestaurantTableViewSet,SubCategoryViewSet
+    FoodItemViewSet,RestaurantTableViewSet,SubCategoryViewSet,OrderHistoryViewSet
 )
 
 # DRF Router for list, retrieve, update, delete
@@ -11,6 +11,7 @@ router = DefaultRouter()
 router.register(r'food-menu', FoodItemViewSet, basename='fooditem')
 router.register(r'tables', RestaurantTableViewSet, basename='table')
 router.register(r'subcategories',SubCategoryViewSet, basename='subcategory')
+router.register(r'orders', OrderHistoryViewSet, basename='orderhistory')
 
 urlpatterns = [
     # === AUTH ENDPOINTS ===
