@@ -487,6 +487,14 @@ class RestaurantTableViewSet(viewsets.ModelViewSet):
         """Soft delete implementation"""
         instance.is_active = False
         instance.save()
+    @action(detail=False, methods=['get'], url_path='active-numbers')
+    def active_numbers(self, request):
+        """
+        GET /api/tables/active-numbers/
+        Returns: [{"table_id": 1, "table_number": "T1"}, ...]
+        """
+        tables = self.get_queryset().values('table_id', 'table_number')
+        return Response(list(tables))
 
 class OrderHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Order.objects.select_related('table').prefetch_related('items').order_by('-created_at')
