@@ -10,6 +10,8 @@ import axios from "axios";
 import Navbar from "./Navbar";
 
 const API_URL = "http://127.0.0.1:8000/api/food-menu/";
+const TABLES_API = "http://127.0.0.1:8000/api/tables/";  // <-- NEW
+const CASHIER_API = "http://127.0.0.1:8000/api/orders/create_order/";
 
 export default function MenuPage() {
   const navigate = useNavigate();
@@ -63,6 +65,8 @@ export default function MenuPage() {
     fetchMenu();
   }, []);
 
+  fetchMenu();
+}, []); // RUN ONCE
   const filtered = useMemo(() => {
     return menuItems.filter((i) => {
       const matchesSearch = i.name.toLowerCase().includes(search.toLowerCase());
@@ -183,6 +187,29 @@ export default function MenuPage() {
       alert("Failed to create order. Please try again.");
     }
   };
+
+  console.log("Sending order:", payload);
+
+  try {
+    const res = await axios.post(CASHIER_API, payload, {
+      headers: { "Content-Type": "application/json" },
+    });
+
+    navigate("/cashier", {
+      state: {
+        order_id: res.data.order_id,
+        tableNumber,
+        total: res.data.total_amount,
+        items: res.data.items,
+      },
+    });
+  } catch (err) {
+    const msg = err.response?.data?.detail || err.message;
+    alert("Order failed: " + msg);
+  }
+};
+
+ 
 
   if (loading) return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">

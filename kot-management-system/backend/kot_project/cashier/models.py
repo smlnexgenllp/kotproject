@@ -54,7 +54,7 @@ class OrderItem(models.Model):
     name = models.CharField(max_length=200)
     quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
-
+    food_id = models.IntegerField(null=True, blank=True)
     def subtotal(self):
         return self.quantity * self.price
 
