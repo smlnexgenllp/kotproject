@@ -3,9 +3,21 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  LayoutDashboard, ShoppingCart, CheckCircle, Users, Settings, LogOut,
-  IndianRupee, Clock, AlertCircle, Coffee, CreditCard, 
-  Smartphone, DollarSign, TrendingUp, ArrowRight
+  LayoutDashboard,
+  ShoppingCart,
+  CheckCircle,
+  Users,
+  Settings,
+  LogOut,
+  IndianRupee,
+  Clock,
+  AlertCircle,
+  Coffee,
+  CreditCard,
+  Smartphone,
+  DollarSign,
+  TrendingUp,
+  ArrowRight,
 } from "lucide-react";
 import API from "../../api";
 
@@ -39,9 +51,24 @@ const Sidebar = ({ active, setActive, onLogout }) => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   const menuItems = [
-    { id: "dashboard", label: "Cashier Dashboard", icon: LayoutDashboard, path: "/cashier" },
-    { id: "pending", label: "Pending Orders", icon: ShoppingCart, path: "/cashier/pending-orders" },
-    { id: "completed", label: "Completed Orders", icon: CheckCircle, path: "/cashier/completed-orders" },
+    {
+      id: "dashboard",
+      label: "Cashier Dashboard",
+      icon: LayoutDashboard,
+      path: "/cashier",
+    },
+    {
+      id: "pending",
+      label: "Pending Orders",
+      icon: ShoppingCart,
+      path: "/cashier/pending-orders",
+    },
+    {
+      id: "completed",
+      label: "Completed Orders",
+      icon: CheckCircle,
+      path: "/cashier/completed-orders",
+    },
     { id: "waiter", label: "Waiter Menu", icon: Users, path: "/menu" },
     { id: "settings", label: "Settings", icon: Settings },
   ];
@@ -65,7 +92,9 @@ const Sidebar = ({ active, setActive, onLogout }) => {
             {user.username?.[0]?.toUpperCase() || "C"}
           </div>
           <div>
-            <p className="text-gray-900 font-semibold">{user.username || "Cashier"}</p>
+            <p className="text-gray-900 font-semibold">
+              {user.username || "Cashier"}
+            </p>
             <p className="text-blue-700 text-xs font-medium">cashier</p>
           </div>
         </div>
@@ -113,11 +142,21 @@ const Sidebar = ({ active, setActive, onLogout }) => {
 // ──────────────────────────────────────
 const CollectionSummary = ({ today, pendingCount }) => {
   const stats = [
-    { label: "Total Collection", value: today.total, color: "blue", icon: IndianRupee },
+    {
+      label: "Total Collection",
+      value: today.total,
+      color: "blue",
+      icon: IndianRupee,
+    },
     { label: "Cash", value: today.cash, color: "green", icon: DollarSign },
     { label: "Card", value: today.card, color: "indigo", icon: CreditCard },
     { label: "UPI", value: today.upi, color: "purple", icon: Smartphone },
-    { label: "Pending Orders", value: pendingCount, color: "orange", icon: ShoppingCart },
+    {
+      label: "Pending Orders",
+      value: pendingCount,
+      color: "orange",
+      icon: ShoppingCart,
+    },
   ];
 
   return (
@@ -132,12 +171,14 @@ const CollectionSummary = ({ today, pendingCount }) => {
         </div>
         <div>
           <h3 className="text-xl font-bold text-gray-900">Today's Summary</h3>
-          <p className="text-sm text-gray-600">{new Date().toLocaleDateString('en-IN', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}</p>
+          <p className="text-sm text-gray-600">
+            {new Date().toLocaleDateString("en-IN", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+          </p>
         </div>
       </div>
 
@@ -151,13 +192,19 @@ const CollectionSummary = ({ today, pendingCount }) => {
             className={`bg-gradient-to-br from-${stat.color}-50 to-white p-4 rounded-xl border border-${stat.color}-200 flex items-center justify-between`}
           >
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 bg-${stat.color}-100 rounded-lg flex items-center justify-center`}>
+              <div
+                className={`w-10 h-10 bg-${stat.color}-100 rounded-lg flex items-center justify-center`}
+              >
                 <stat.icon size={20} className={`text-${stat.color}-700`} />
               </div>
               <div>
-                <p className="text-sm text-gray-600 font-medium">{stat.label}</p>
+                <p className="text-sm text-gray-600 font-medium">
+                  {stat.label}
+                </p>
                 <p className={`text-2xl font-bold text-${stat.color}-700 mt-1`}>
-                  {stat.label === "Pending Orders" ? stat.value : `₹${safeFixed(stat.value)}`}
+                  {stat.label === "Pending Orders"
+                    ? stat.value
+                    : `₹${safeFixed(stat.value)}`}
                 </p>
               </div>
             </div>
@@ -213,11 +260,15 @@ const OrderHistory = ({ orders = [] }) => {
                   <PaymentIcon mode={order.payment_mode} />
                   <div>
                     <p className="font-semibold text-gray-800">
-                      Table {order.table_number} 
-                      <span className="text-gray-600 ml-2">#{order.order_id}</span>
+                      Table {order.table_number}
+                      <span className="text-gray-600 ml-2">
+                        #{order.order_id}
+                      </span>
                     </p>
                     <p className="text-sm text-gray-600">
-                      {order.paid_at ? new Date(order.paid_at).toLocaleTimeString() : "—"}
+                      {order.paid_at
+                        ? new Date(order.paid_at).toLocaleTimeString()
+                        : "—"}
                     </p>
                   </div>
                 </div>
@@ -226,7 +277,9 @@ const OrderHistory = ({ orders = [] }) => {
                     <IndianRupee size={16} />
                     {amount.toFixed(2)}
                   </p>
-                  <p className="text-xs text-gray-600 capitalize mt-1">{order.payment_mode}</p>
+                  <p className="text-xs text-gray-600 capitalize mt-1">
+                    {order.payment_mode}
+                  </p>
                 </div>
               </motion.div>
             );
@@ -248,22 +301,22 @@ const QuickActions = ({ pendingCount, onNavigate }) => {
       count: pendingCount,
       icon: ShoppingCart,
       color: "orange",
-      path: "/cashier/pending-orders"
+      path: "/cashier/pending-orders",
     },
     {
       label: "Completed Orders",
       description: "View order history",
       icon: CheckCircle,
       color: "green",
-      path: "/cashier/completed-orders"
+      path: "/cashier/completed-orders",
     },
     {
       label: "Print Reports",
       description: "Generate daily reports",
       icon: Clock,
       color: "blue",
-      path: "/cashier/reports"
-    }
+      path: "/cashier/reports",
+    },
   ];
 
   return (
@@ -273,7 +326,7 @@ const QuickActions = ({ pendingCount, onNavigate }) => {
       className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200"
     >
       <h3 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h3>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {actions.map((action, index) => (
           <motion.button
@@ -284,26 +337,31 @@ const QuickActions = ({ pendingCount, onNavigate }) => {
             className={`bg-gradient-to-br from-${action.color}-50 to-white p-5 rounded-xl border border-${action.color}-200 text-left hover:shadow-md transition-all group`}
           >
             <div className="flex items-center justify-between mb-3">
-              <div className={`w-12 h-12 bg-${action.color}-100 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform`}>
+              <div
+                className={`w-12 h-12 bg-${action.color}-100 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform`}
+              >
                 <action.icon size={24} className={`text-${action.color}-700`} />
               </div>
               {action.count !== undefined && (
-                <span className={`bg-${action.color}-100 text-${action.color}-800 px-2 py-1 rounded-full text-sm font-bold`}>
+                <span
+                  className={`bg-${action.color}-100 text-${action.color}-800 px-2 py-1 rounded-full text-sm font-bold`}
+                >
                   {action.count}
                 </span>
               )}
             </div>
-            
+
             <h4 className={`font-bold text-${action.color}-900 text-lg mb-2`}>
               {action.label}
             </h4>
-            <p className="text-gray-600 text-sm mb-3">
-              {action.description}
-            </p>
-            
+            <p className="text-gray-600 text-sm mb-3">{action.description}</p>
+
             <div className="flex items-center text-blue-600 font-medium text-sm">
               <span>View Details</span>
-              <ArrowRight size={16} className="ml-1 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight
+                size={16}
+                className="ml-1 group-hover:translate-x-1 transition-transform"
+              />
             </div>
           </motion.button>
         ))}
@@ -319,11 +377,11 @@ const CashierDashboard = () => {
   const [active, setActive] = useState("dashboard");
   const [pendingOrders, setPendingOrders] = useState([]);
   const [completedOrders, setCompletedOrders] = useState([]);
-  const [todayCollection, setTodayCollection] = useState({ 
-    total: 0, 
-    cash: 0, 
-    card: 0, 
-    upi: 0 
+  const [todayCollection, setTodayCollection] = useState({
+    total: 0,
+    cash: 0,
+    card: 0,
+    upi: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -336,19 +394,24 @@ const CashierDashboard = () => {
       const allOrders = res.data;
 
       // Filter orders
-      const pending = allOrders.filter(o => o.status === "pending");
-      const completed = allOrders.filter(o => o.status === "paid" && o.paid_at);
+      const pending = allOrders.filter((o) => o.status === "pending");
+      const completed = allOrders.filter(
+        (o) => o.status === "paid" && o.paid_at
+      );
 
       // Calculate today's collection
       const today = new Date().toISOString().split("T")[0];
-      const todayPaid = completed.filter(o => o.paid_at?.startsWith(today));
+      const todayPaid = completed.filter((o) => o.paid_at?.startsWith(today));
 
-      const collection = todayPaid.reduce((acc, o) => {
-        const amount = parseFloat(o.total_amount) || 0;
-        acc.total += amount;
-        if (o.payment_mode in acc) acc[o.payment_mode] += amount;
-        return acc;
-      }, { total: 0, cash: 0, card: 0, upi: 0 });
+      const collection = todayPaid.reduce(
+        (acc, o) => {
+          const amount = parseFloat(o.total_amount) || 0;
+          acc.total += amount;
+          if (o.payment_mode in acc) acc[o.payment_mode] += amount;
+          return acc;
+        },
+        { total: 0, cash: 0, card: 0, upi: 0 }
+      );
 
       setPendingOrders(pending);
       setCompletedOrders(todayPaid);
@@ -380,8 +443,8 @@ const CashierDashboard = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
-          <motion.div 
-            animate={{ rotate: 360 }} 
+          <motion.div
+            animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
             className="mx-auto mb-4"
           >
@@ -404,21 +467,21 @@ const CashierDashboard = () => {
       <Sidebar active={active} setActive={setActive} onLogout={handleLogout} />
 
       <main className="flex-1 ml-72 p-6 md:p-10">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           className="max-w-7xl mx-auto"
         >
           {/* Header */}
           <div className="mb-10">
-            <motion.h1 
+            <motion.h1
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               className="text-5xl font-extrabold text-blue-900 mb-3"
             >
               Cashier Dashboard
             </motion.h1>
-            <motion.p 
+            <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.1 }}
@@ -442,7 +505,7 @@ const CashierDashboard = () => {
                   <p className="font-semibold">Connection Error</p>
                   <p className="text-sm">{error}</p>
                 </div>
-                <button 
+                <button
                   onClick={fetchData}
                   className="ml-auto bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
                 >
@@ -454,9 +517,9 @@ const CashierDashboard = () => {
 
           {/* Quick Actions */}
           <div className="mb-8">
-            <QuickActions 
-              pendingCount={pendingOrders.length} 
-              onNavigate={handleNavigate} 
+            <QuickActions
+              pendingCount={pendingOrders.length}
+              onNavigate={handleNavigate}
             />
           </div>
 
@@ -464,9 +527,9 @@ const CashierDashboard = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left Column - Summary */}
             <div className="lg:col-span-1">
-              <CollectionSummary 
-                today={todayCollection} 
-                pendingCount={pendingOrders.length} 
+              <CollectionSummary
+                today={todayCollection}
+                pendingCount={pendingOrders.length}
               />
             </div>
 
@@ -477,7 +540,7 @@ const CashierDashboard = () => {
           </div>
 
           {/* Stats Footer */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
@@ -485,11 +548,15 @@ const CashierDashboard = () => {
           >
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-center">
               <div>
-                <p className="text-2xl font-bold text-blue-700">{pendingOrders.length}</p>
+                <p className="text-2xl font-bold text-blue-700">
+                  {pendingOrders.length}
+                </p>
                 <p className="text-gray-600 text-sm">Pending Orders</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-green-700">{completedOrders.length}</p>
+                <p className="text-2xl font-bold text-green-700">
+                  {completedOrders.length}
+                </p>
                 <p className="text-gray-600 text-sm">Completed Today</p>
               </div>
               <div>
@@ -500,8 +567,8 @@ const CashierDashboard = () => {
               </div>
               <div>
                 <p className="text-2xl font-bold text-indigo-700">
-                  {new Date().getHours().toString().padStart(2, '0')}:
-                  {new Date().getMinutes().toString().padStart(2, '0')}
+                  {new Date().getHours().toString().padStart(2, "0")}:
+                  {new Date().getMinutes().toString().padStart(2, "0")}
                 </p>
                 <p className="text-gray-600 text-sm">Current Time</p>
               </div>

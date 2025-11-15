@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import CashierOrderViewSet
 
 router = DefaultRouter()
-router.register(r'orders', CashierOrderViewSet)
+router.register(r'cashier-orders', CashierOrderViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

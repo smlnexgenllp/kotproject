@@ -2,7 +2,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator
 from django.utils import timezone
-
+from management.models import AdminUser
 
 class Order(models.Model):
     PAYMENT_MODE_CHOICES = [
@@ -16,7 +16,13 @@ class Order(models.Model):
         ('paid', 'Paid'),
         ('cancelled', 'Cancelled'),
     ]
-
+    waiter = models.ForeignKey(
+        AdminUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='orders'
+    )
     order_id = models.AutoField(primary_key=True)
     table_number = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
@@ -26,7 +32,7 @@ class Order(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
     paid_at = models.DateTimeField(null=True, blank=True)
-
+   
     class Meta:
         ordering = ['-created_at']
         indexes = [

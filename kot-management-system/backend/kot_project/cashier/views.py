@@ -9,7 +9,7 @@ from datetime import date
 
 from .models import Order, OrderItem
 from .serializers import OrderSerializer
-
+from  management.models import AdminUser
 
 class CashierOrderViewSet(viewsets.ModelViewSet):
     """
@@ -29,27 +29,46 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='create_order')
     def create_order(self, request):
         data = request.data
-
-        try:
-            # Validate required fields
+        try: 
+        # Validate required fields
             required = ['tableNumber', 'total', 'cart']
             missing = [field for field in required if field not in data]
             if missing:
-                return Response(
-                    {"detail": f"Missing fields: {', '.join(missing)}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+               return Response(
+                {"detail": f"Missing fields: {', '.join(missing)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-            # Create Order
+        # Get waiter
+            waiter_id = data.get('waiter_id')
+            waiter = None
+            if waiter_id:
+                try:
+                   waiter = AdminUser.objects.get(id=waiter_id)
+                except AdminUser.DoesNotExist:
+                   return Response({"detail": "Invalid waiter_id"}, status=400)
+
+        # Determine payment mode
+            payment_mode = data.get('paymentMode', 'cash').lower()
+            is_online_payment = payment_mode in ['upi', 'card']
+
+        # Create Order
             order = Order.objects.create(
                 table_number=int(data['tableNumber']),
                 total_amount=float(data['total']),
-                payment_mode=data.get('paymentMode', 'cash').lower(),
+                payment_mode=payment_mode,
                 received_amount=float(data.get('received_amount', data['total'])),
-                status='pending'
-            )
+                status='paid' if is_online_payment else 'pending',  # ← AUTO PAID
+                waiter=waiter
+        )
 
-            # Create OrderItems
+        # Auto-set paid_at for online payments
+            if is_online_payment:
+                order.paid_at = timezone.now()
+                order.save(update_fields=['paid_at'])  # Skip full save() to avoid balance recalc
+
+        # Create OrderItems
+
             cart = data.get('cart', [])
             if not isinstance(cart, list):
                 return Response({"detail": "cart must be a list"}, status=400)
@@ -58,18 +77,21 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
             for item in cart:
                 if not all(k in item for k in ['name', 'quantity', 'price']):
                     return Response({"detail": "Invalid item in cart"}, status=400)
-                order_items.append(
-                    OrderItem(
-                        order=order,
-                        name=str(item['name']),
-                        quantity=int(item['quantity']),
-                        price=float(item['price'])
-                    )
+            order_items.append(
+                OrderItem(
+                    order=order,
+                    food_id=item.get('food_id'),        # ← SAVE FOOD ID
+                    name=str(item['name']),
+                    quantity=int(item['quantity']),
+                    price=float(item['price'])
                 )
+            )
             OrderItem.objects.bulk_create(order_items)
 
-            # Recalculate balance (via model save)
-            order.save()
+        # Recalculate balance only for cash (online has no change)
+            if not is_online_payment:
+                order.save()  # Triggers balance_amount calculation
+
 
             serializer = OrderSerializer(order)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -78,6 +100,7 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
             return Response({"detail": f"Invalid data type: {e}"}, status=400)
         except Exception as e:
             return Response({"detail": str(e)}, status=400)
+
 
     # ──────────────────────────────
     # 2. MARK AS PAID

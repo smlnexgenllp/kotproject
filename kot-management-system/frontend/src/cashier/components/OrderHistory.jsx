@@ -5,9 +5,12 @@ import { CheckCircle, XCircle, Clock, IndianRupee } from "lucide-react";
 
 const getStatusIcon = (status) => {
   switch (status) {
-    case "paid": return <CheckCircle className="text-green-600" size={18} />;
-    case "cancelled": return <XCircle className="text-red-600" size={18} />;
-    default: return <Clock className="text-orange-600" size={18} />;
+    case "paid":
+      return <CheckCircle className="text-green-600" size={18} />;
+    case "cancelled":
+      return <XCircle className="text-red-600" size={18} />;
+    default:
+      return <Clock className="text-orange-600" size={18} />;
   }
 };
 
@@ -20,7 +23,9 @@ const OrderHistory = ({ orders = [] }) => {
         className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200"
       >
         <h3 className="text-xl font-bold text-gray-900 mb-5">Order History</h3>
-        <p className="text-center text-gray-500 py-8">No completed orders today</p>
+        <p className="text-center text-gray-500 py-8">
+          No completed orders today
+        </p>
       </motion.div>
     );
   }
@@ -53,7 +58,9 @@ const OrderHistory = ({ orders = [] }) => {
                     Table {order.table_number} #{order.order_id}
                   </p>
                   <p className="text-sm text-gray-600">
-                    {order.paid_at ? new Date(order.paid_at).toLocaleTimeString() : "—"}
+                    {order.paid_at
+                      ? new Date(order.paid_at).toLocaleTimeString()
+                      : "—"}
                   </p>
                 </div>
               </div>
@@ -62,7 +69,9 @@ const OrderHistory = ({ orders = [] }) => {
                   <IndianRupee size={16} />
                   {amount.toFixed(2)}
                 </p>
-                <p className="text-xs text-gray-600 capitalize">{order.payment_mode}</p>
+                <p className="text-xs text-gray-600 capitalize">
+                  {order.payment_mode}
+                </p>
               </div>
             </motion.div>
           );

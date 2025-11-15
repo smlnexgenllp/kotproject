@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
+import Navbar from '../../users/components/Navbar.jsx'
 
 export default function CashierWait() {
   const { state } = useLocation();
@@ -22,6 +23,8 @@ export default function CashierWait() {
   }, [orderId, navigate]);
 
   return (
+    <>
+    <Navbar/>
     <div className="min-h-screen bg-blue-50 flex items-center justify-center p-6">
       <div className="bg-white rounded-2xl shadow-2xl p-10 text-center max-w-md">
         <div className="animate-spin text-blue-600 mb-6">
@@ -32,5 +35,6 @@ export default function CashierWait() {
         <p className="text-gray-500 mt-4">Please wait while cashier confirms payment</p>
       </div>
     </div>
+    </>
   );
 }

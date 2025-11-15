@@ -475,7 +475,7 @@ class SubCategoryViewSet(viewsets.ModelViewSet):
 
 class RestaurantTableViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for managing restaurant tables
+    ViewSet for managing restaurant tables 
     """
     queryset = RestaurantTable.objects.filter(is_active=True).order_by('table_number')
     serializer_class = RestaurantTableSerializer
@@ -484,6 +484,13 @@ class RestaurantTableViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         """Soft delete implementation"""
         instance.is_active = False
-        instance.save()        
+        instance.save()
 
-      
+    @action(detail=False, methods=['get'], url_path='active-numbers')
+    def active_numbers(self, request):
+        """
+        GET /api/tables/active-numbers/
+        Returns: [{"table_id": 1, "table_number": "T1"}, ...]
+        """
+        tables = self.get_queryset().values('table_id', 'table_number')
+        return Response(list(tables))

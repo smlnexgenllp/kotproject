@@ -24,8 +24,12 @@ const CollectionSummary = ({ today }) => {
           <IndianRupee size={24} />
         </div>
         <div>
-          <h3 className="text-xl font-bold text-gray-900">Today's Collection</h3>
-          <p className="text-sm text-gray-600">{new Date().toLocaleDateString()}</p>
+          <h3 className="text-xl font-bold text-gray-900">
+            Today's Collection
+          </h3>
+          <p className="text-sm text-gray-600">
+            {new Date().toLocaleDateString()}
+          </p>
         </div>
       </div>
 
