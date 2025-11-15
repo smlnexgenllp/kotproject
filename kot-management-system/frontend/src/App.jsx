@@ -12,6 +12,9 @@ import AddFoodForm from './admin/components/AddFoodForm';
 import FoodList from './admin/components/FoodList';
 import CashierPortal from './cashier/components/CashierPortal';
 import CashierWait from './cashier/pages/CashierWait';
+import PendingOrdersPage from './cashier/components/PendingOrdersPage';
+import CompletedOrdersPage from './cashier/components/CompletedOrdersPage';
+
 
 
 
@@ -24,13 +27,15 @@ function App() {
       <Route path="/" element={<Login />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/menu" element={<MenuPage />} />
-        <Route path="/payment" element={<PaymentPage/>} />
-        <Route path="/success" element={<OrderSuccess />} />
+      <Route path="/payment" element={<PaymentPage />} />
+      <Route path="/success" element={<OrderSuccess />} />
       <Route path="/food-menu" element={<FoodList />} />
       <Route path="/add-food" element={<AddFoodForm />} />
-       <Route path="/edit-food/:id" element={<EditFoodForm />} />
-       <Route path="/cashier" element={<CashierPortal/>} />
+      <Route path="/edit-food/:id" element={<EditFoodForm />} />
+      <Route path="/cashier" element={<CashierPortal />} />
       <Route path="/cashier-wait" element={<CashierWait />} />
+      <Route path="/cashier/pending-orders" element={<PendingOrdersPage />} />
+      <Route path="/cashier/completed-orders" element={<CompletedOrdersPage />} />
     </Routes>
   );
 }
