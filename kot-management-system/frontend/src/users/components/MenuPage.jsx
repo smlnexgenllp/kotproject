@@ -3,15 +3,26 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Coffee, Pizza, IceCream, Plus, Minus, X, Check, Search,
-  ShoppingCart, Loader2, Utensils, Table, User, Image
+  Coffee,
+  Pizza,
+  IceCream,
+  Plus,
+  Minus,
+  X,
+  Check,
+  Search,
+  ShoppingCart,
+  Loader2,
+  Utensils,
+  Table,
+  User,
+  Image,
 } from "lucide-react";
 import axios from "axios";
 import Navbar from "./Navbar";
 
 const API_URL = "http://127.0.0.1:8000/api/food-menu/";
-const TABLES_API = "http://127.0.0.1:8000/api/tables/";   // <-- NEW
-const CASHIER_API = "http://127.0.0.1:8000/api/cashier-orders/create_order/";
+const TABLES_API = "http://127.0.0.1:8000/api/tables/active-numbers/";
 
 export default function MenuPage() {
   const navigate = useNavigate();
@@ -28,9 +39,12 @@ export default function MenuPage() {
   const [error, setError] = useState("");
   const [user] = useState(JSON.parse(localStorage.getItem("user") || "{}"));
 
-  /* --------------------------------------------------------------
-     FETCH MENU + CATEGORIES (once on mount)
-     -------------------------------------------------------------- */
+  // NEW: Dynamic tables state
+  const [activeTables, setActiveTables] = useState([]);
+  const [tablesLoading, setTablesLoading] = useState(true);
+  const [tablesError, setTablesError] = useState("");
+
+  // Fetch Menu + Categories
   useEffect(() => {
     const fetchMenu = async () => {
       try {
@@ -40,12 +54,12 @@ export default function MenuPage() {
           axios.get(API_URL + "categories/"),
         ]);
 
-        const items = itemsRes.data.map(item => ({
+        const items = itemsRes.data.map((item) => ({
           id: item.id,
           food_id: item.id,
           name: item.food_name,
           price: item.price,
-          category: (item.category?.toLowerCase() || "uncategorized"),
+          category: item.category?.toLowerCase() || "uncategorized",
           image: item.image || null,
           food_type: item.food_type || "veg",
           original_price: item.original_price || null,
@@ -55,7 +69,7 @@ export default function MenuPage() {
           is_available_now: item.is_available_now !== false,
         }));
 
-        const cats = catsRes.data.map(c => c.toLowerCase());
+        const cats = catsRes.data.map((c) => c.toLowerCase());
         setMenuItems(items);
         setCategories(["all", ...cats]);
       } catch (err) {
@@ -65,83 +79,94 @@ export default function MenuPage() {
         setLoading(false);
       }
     };
-
     fetchMenu();
-  }, []);   // <-- ONLY ONCE
+  }, []);
 
-  /* --------------------------------------------------------------
-     FILTERED LIST (search + category)
-     -------------------------------------------------------------- */
+  // Fetch Active Tables
+  useEffect(() => {
+    const fetchTables = async () => {
+      try {
+        setTablesLoading(true);
+        const res = await axios.get(TABLES_API);
+        setActiveTables(res.data);
+      } catch (err) {
+        setTablesError("Failed to load tables");
+        console.error(err);
+      } finally {
+        setTablesLoading(false);
+      }
+    };
+    fetchTables();
+  }, []);
+
   const filtered = useMemo(() => {
-    return menuItems.filter(i => {
+    return menuItems.filter((i) => {
       const matchesSearch = i.name.toLowerCase().includes(search.toLowerCase());
       const matchesCat = activeCat === "all" || i.category === activeCat;
       return matchesSearch && matchesCat;
     });
   }, [menuItems, search, activeCat]);
 
-  /* --------------------------------------------------------------
-     CART HELPERS
-     -------------------------------------------------------------- */
-  const addToCart = item => {
-    setCart(prev => {
-      const exists = prev.find(c => c.id === item.id);
-      if (exists) {
-        // toggle-off if already in cart
-        return prev.filter(c => c.id !== item.id);
+  // Cart functionality
+  const addToCart = (item) => {
+    setCart((prev) => {
+      const existing = prev.find((i) => i.id === item.id);
+      if (existing) {
+        return prev.map((i) =>
+          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+        );
       }
       return [...prev, { ...item, quantity: 1 }];
     });
   };
 
   const updateQuantity = (id, delta) => {
-    setCart(prev =>
+    setCart((prev) =>
       prev
-        .map(i => (i.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i))
-        .filter(i => i.quantity > 0)
+        .map((item) =>
+          item.id === id
+            ? { ...item, quantity: Math.max(0, item.quantity + delta) }
+            : item
+        )
+        .filter((item) => item.quantity > 0)
     );
   };
 
-  const total = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const itemCount = cart.reduce((sum, i) => sum + i.quantity, 0);
-  const getCartQuantity = id => cart.find(i => i.id === id)?.quantity || 0;
+  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  /* --------------------------------------------------------------
-     IMAGE URL NORMALISER
-     -------------------------------------------------------------- */
-  const getImageUrl = item => {
+  // WRONG — may use stale `cart`
+  const getCartQuantity = (itemId) => {
+    const cartItem = cart.find((item) => item.id === itemId);
+    return cartItem ? cartItem.quantity : 0;
+  };
+
+  const getImageUrl = (item) => {
     if (!item.image) return null;
     const img = item.image.trim();
 
     if (img.startsWith("https://res.cloudinary.com")) return img;
-
     if (img.includes("image/upload/https://res.cloudinary.com")) {
       return img.substring(img.indexOf("https://res.cloudinary.com"));
     }
-
     if (img.startsWith("kot/")) {
       return `https://res.cloudinary.com/dx0w3e13s/image/upload/w_300,h_200,c_fill/${img}`;
     }
-
     if (img.includes("cloudinary.com")) {
       try {
         const url = new URL(img);
-        const parts = url.pathname.split("/");
-        const idx = parts.indexOf("upload") + 1;
-        const publicId = parts.slice(idx).join("/");
+        const pathParts = url.pathname.split("/");
+        const publicId = pathParts
+          .slice(pathParts.indexOf("upload") + 1)
+          .join("/");
         return `https://res.cloudinary.com/dx0w3e13s/image/upload/w_300,h_200,c_fill/${publicId}`;
       } catch {
-        console.warn("Bad Cloudinary URL:", img);
         return null;
       }
     }
-
     return null;
   };
 
-  /* --------------------------------------------------------------
-     CREATE ORDER (cashier endpoint)
-     -------------------------------------------------------------- */
   const handleProceed = async () => {
     if (!tableNumber.trim()) {
       setShowTableModal(true);
@@ -152,42 +177,50 @@ export default function MenuPage() {
       return;
     }
 
-    const payload = {
-      tableNumber: parseInt(tableNumber, 10),
-      total,
-      paymentMode: "cash",
-      cart: cart.map(i => ({
-        food_id: i.food_id,
-        name: i.name,
-        quantity: i.quantity,
-        price: i.price,
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    if (!user.id) {
+      alert("Waiter not logged in!");
+      return;
+    }
+
+    const orderData = {
+      tableNumber: parseInt(tableNumber),
+      total: total,
+      cart: cart.map((item) => ({
+        food_id: item.food_id,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
       })),
+      paymentMode: "cash",
+      received_amount: total,
+      waiter_id: user.id,
     };
 
     try {
-      const res = await axios.post(CASHIER_API, payload, {
-        headers: { "Content-Type": "application/json" },
-      });
+      const response = await axios.post(
+        "http://127.0.0.1:8000/api/cashier-orders/create_order/",
+        orderData,
+        { headers: { "Content-Type": "application/json" } }
+      );
 
       navigate("/payment", {
         state: {
           tableNumber,
           cart,
           total,
-          orderId: res.data.order_id,
+          orderId: response.data.order_id,
+          waiter_name: response.data.waiter_name,
         },
       });
     } catch (err) {
       const msg = err.response?.data?.detail || err.message;
-      alert("Order failed: " + msg);
-      console.error(err);
+      console.error("Order creation failed:", err);
+      alert(`Failed to create order: ${msg}`);
     }
   };
 
-  /* --------------------------------------------------------------
-     RENDER
-     -------------------------------------------------------------- */
-  if (loading) {
+  if (loading)
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
@@ -202,9 +235,8 @@ export default function MenuPage() {
         </div>
       </div>
     );
-  }
 
-  if (error) {
+  if (error)
     return (
       <div className="min-h-screen bg-red-50 flex items-center justify-center p-4">
         <div className="text-center">
@@ -218,11 +250,9 @@ export default function MenuPage() {
         </div>
       </div>
     );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
-      {/* NAVBAR */}
       <Navbar
         user={user}
         cartCount={itemCount}
@@ -231,7 +261,6 @@ export default function MenuPage() {
         onShowTable={() => setShowTableModal(true)}
       />
 
-      {/* HERO */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-6">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <motion.h1
@@ -252,27 +281,27 @@ export default function MenuPage() {
         </div>
       </div>
 
-      {/* SEARCH + CATEGORIES */}
       <div className="max-w-7xl mx-auto px-4 mt-6">
         <div className="flex flex-col lg:flex-row gap-4 mb-6">
-          {/* Search */}
           <div className="flex-1">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-600" size={20} />
+              <Search
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-600"
+                size={20}
+              />
               <input
                 type="text"
                 placeholder="Search food items..."
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-12 pr-6 py-3 rounded-xl border-2 border-blue-200 focus:border-blue-500 outline-none text-base shadow-lg bg-white"
               />
             </div>
           </div>
 
-          {/* Categories */}
           <div className="flex-1 overflow-x-auto">
             <div className="flex gap-2">
-              {categories.map(cat => (
+              {categories.map((cat) => (
                 <motion.button
                   key={cat}
                   whileHover={{ scale: 1.05 }}
@@ -284,81 +313,90 @@ export default function MenuPage() {
                       : "bg-white text-blue-700 border border-blue-300 hover:border-blue-500"
                   }`}
                 >
-                  {cat === "all" ? "All" : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  {cat === "all"
+                    ? "All"
+                    : cat.charAt(0).toUpperCase() + cat.slice(1)}
                 </motion.button>
               ))}
             </div>
           </div>
         </div>
 
-        {/* MENU GRID */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-20">
-          {filtered.map((item, idx) => {
-            const qty = getCartQuantity(item.id);
+          {filtered.map((item, index) => {
+            const cartQuantity = getCartQuantity(item.id);
             const isVeg = item.food_type === "veg";
-            const available = item.is_available_now && item.stock_status === "in_stock";
-            const imgUrl = getImageUrl(item);
-            const hasImg = imgUrl !== null;
+            const isAvailable =
+              item.is_available_now && item.stock_status === "in_stock";
+            const imageUrl = getImageUrl(item);
+            const hasImage = imageUrl !== null;
 
             return (
               <motion.div
                 key={item.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: idx * 0.05 }}
-                className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 border border-gray-200 overflow-hidden group flex h-28"
+                transition={{ duration: 0.3, delay: index * 0.05 }}
+                className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 border border-gray-200 overflow-hidden group flex h-28 cursor-pointer"
               >
-                {/* IMAGE */}
                 <div className="w-28 h-28 flex-shrink-0 relative overflow-hidden bg-gray-100">
-                  {hasImg ? (
+                  {hasImage ? (
                     <img
-                      src={imgUrl}
+                      src={imageUrl}
                       alt={item.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      onError={e => {
+                      onError={(e) => {
                         e.target.style.display = "none";
                         e.target.nextSibling.style.display = "flex";
                       }}
                     />
                   ) : null}
-                  <div className={`w-full h-full flex items-center justify-center ${hasImg ? "hidden" : "flex"}`}>
+
+                  <div
+                    className={`w-full h-full flex items-center justify-center ${
+                      hasImage ? "hidden" : "flex"
+                    }`}
+                  >
                     <div className="text-center">
                       <Image className="mx-auto text-gray-400 mb-1" size={20} />
-                      <span className="text-xs text-gray-500 font-medium">No Image</span>
+                      <span className="text-xs text-gray-500 font-medium">
+                        No Image
+                      </span>
                     </div>
                   </div>
 
-                  {/* VEG/NON-VEG ICON */}
                   <div className="absolute top-1 left-1">
                     <div
                       className={`w-5 h-5 border-2 rounded-sm flex items-center justify-center ${
-                        isVeg ? "border-green-600 bg-green-50" : "border-red-600 bg-red-50"
+                        isVeg
+                          ? "border-green-600 bg-green-50"
+                          : "border-red-600 bg-red-50"
                       }`}
                     >
-                      <div className={`w-2 h-2 rounded-full ${isVeg ? "bg-green-600" : "bg-red-600"}`} />
+                      <div
+                        className={`w-2 h-2 rounded-full ${
+                          isVeg ? "bg-green-600" : "bg-red-600"
+                        }`}
+                      />
                     </div>
                   </div>
-
-                  {/* OUT OF STOCK */}
-                  {!available && (
-                    <div className="absolute bottom-1 left-1 right-1 bg-red-600 text-white text-xs px-1 py-0.5 rounded text-center font-semibold">
-                      Out of Stock
-                    </div>
-                  )}
                 </div>
 
-                {/* DETAILS */}
                 <div className="flex-1 p-2 flex flex-col justify-between min-w-0">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2 mb-1">
                       {item.name}
                     </h3>
-                    <p className="text-gray-500 text-xs capitalize mb-1">{item.category}</p>
+                    <p className="text-gray-500 text-xs capitalize mb-1">
+                      {item.category}
+                    </p>
                   </div>
 
                   <div className="flex justify-between items-center">
                     <div className="min-w-0">
-                      <span className="text-base font-bold text-gray-900">₹{item.price}</span>
+                      <span className="text-base font-bold text-gray-900">
+                        ₹{item.price}
+                      </span>
                       {item.original_price && (
                         <span className="text-xs text-gray-500 line-through ml-1">
                           ₹{item.original_price}
@@ -366,15 +404,14 @@ export default function MenuPage() {
                       )}
                     </div>
 
-                    {/* ADD / QUANTITY */}
-                    {!available ? (
+                    {!isAvailable ? (
                       <div className="text-xs text-red-600 font-semibold px-2 py-1 bg-red-50 rounded border border-red-200">
                         Unavailable
                       </div>
-                    ) : qty > 0 ? (
+                    ) : cartQuantity > 0 ? (
                       <div className="flex items-center border border-green-500 rounded-lg overflow-hidden bg-green-50">
                         <button
-                          onClick={e => {
+                          onClick={(e) => {
                             e.stopPropagation();
                             updateQuantity(item.id, -1);
                           }}
@@ -383,10 +420,10 @@ export default function MenuPage() {
                           −
                         </button>
                         <span className="w-6 text-center font-bold text-green-700 text-xs flex items-center justify-center">
-                          {qty}
+                          {cartQuantity}
                         </span>
                         <button
-                          onClick={e => {
+                          onClick={(e) => {
                             e.stopPropagation();
                             updateQuantity(item.id, 1);
                           }}
@@ -396,17 +433,15 @@ export default function MenuPage() {
                         </button>
                       </div>
                     ) : (
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={e => {
+                      <div
+                        onClick={(e) => {
                           e.stopPropagation();
                           addToCart(item);
                         }}
-                        className="bg-green-500 hover:bg-green-600 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-all duration-300 shadow-md whitespace-nowrap"
+                        className="bg-green-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold"
                       >
                         ADD
-                      </motion.button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -414,18 +449,21 @@ export default function MenuPage() {
             );
           })}
 
-          {/* NO RESULTS */}
           {filtered.length === 0 && (
             <div className="col-span-full text-center py-12">
               <Search size={48} className="mx-auto text-gray-400 mb-4" />
-              <p className="text-xl text-gray-600 font-bold mb-2">No items found</p>
-              <p className="text-gray-500 text-sm">Try different search or category</p>
+              <p className="text-xl text-gray-600 font-bold mb-2">
+                No items found
+              </p>
+              <p className="text-gray-500 text-sm">
+                Try different search or category
+              </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* TABLE MODAL */}
+      {/* ==================== DYNAMIC TABLE MODAL ==================== */}
       <AnimatePresence>
         {showTableModal && (
           <motion.div
@@ -440,45 +478,51 @@ export default function MenuPage() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6"
-              onClick={e => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <Table className="text-blue-600" size={32} />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Table Number</h3>
-                <p className="text-gray-600">Enter your table number to continue</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  Table Number
+                </h3>
+                <p className="text-gray-600">Select your table to continue</p>
               </div>
 
               <div className="space-y-4">
-                <input
-                  type="number"
-                  placeholder="Enter table number..."
-                  value={tableNumber}
-                  onChange={e => setTableNumber(e.target.value)}
-                  className="w-full px-4 py-3 text-lg text-center rounded-xl border-2 border-blue-200 focus:border-blue-500 outline-none bg-blue-50 font-bold"
-                  min="1"
-                  autoFocus
-                />
-
-                <div className="grid grid-cols-3 gap-3">
-                  {[1, 2, 3, 4, 5, 6].map(n => (
-                    <button
-                      key={n}
-                      onClick={() => setTableNumber(n.toString())}
-                      className={`py-2 rounded-lg font-semibold transition-all ${
-                        tableNumber === n.toString()
-                          ? "bg-blue-600 text-white shadow-lg"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
-                    >
-                      Table {n}
-                    </button>
-                  ))}
-                </div>
+                {tablesLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="animate-spin text-blue-600" size={32} />
+                  </div>
+                ) : tablesError ? (
+                  <p className="text-center text-red-600">{tablesError}</p>
+                ) : activeTables.length === 0 ? (
+                  <p className="text-center text-gray-600">
+                    No active tables found
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {activeTables.map((table) => (
+                      <button
+                        key={table.table_id}
+                        onClick={() => setTableNumber(table.table_number)}
+                        className={`py-2 rounded-lg font-semibold transition-all ${
+                          tableNumber === table.table_number
+                            ? "bg-blue-600 text-white shadow-lg"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                      >
+                        Table {table.table_number}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 <button
-                  onClick={() => tableNumber.trim() && setShowTableModal(false)}
+                  onClick={() => {
+                    if (tableNumber.trim()) setShowTableModal(false);
+                  }}
                   disabled={!tableNumber.trim()}
                   className={`w-full py-3 rounded-xl font-bold text-white transition-all ${
                     tableNumber.trim()
@@ -494,7 +538,7 @@ export default function MenuPage() {
         )}
       </AnimatePresence>
 
-      {/* CART MODAL */}
+      {/* ==================== CART MODAL (unchanged) ==================== */}
       <AnimatePresence>
         {showCartModal && (
           <motion.div
@@ -509,9 +553,8 @@ export default function MenuPage() {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               className="bg-white w-full max-w-md rounded-t-2xl lg:rounded-2xl shadow-2xl max-h-[80vh] overflow-hidden"
-              onClick={e => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
               <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 flex justify-between items-center">
                 <div>
                   <h2 className="text-xl font-bold">Your Order</h2>
@@ -527,16 +570,22 @@ export default function MenuPage() {
                 </button>
               </div>
 
-              {/* Items */}
               <div className="max-h-64 overflow-y-auto p-4 space-y-3">
                 {cart.length === 0 ? (
                   <div className="text-center py-8">
-                    <ShoppingCart size={48} className="mx-auto text-gray-400 mb-3" />
-                    <p className="text-lg text-gray-600 font-bold">Your cart is empty</p>
-                    <p className="text-gray-500 text-sm mt-1">Add some items to get started!</p>
+                    <ShoppingCart
+                      size={48}
+                      className="mx-auto text-gray-400 mb-3"
+                    />
+                    <p className="text-lg text-gray-600 font-bold">
+                      Your cart is empty
+                    </p>
+                    <p className="text-gray-500 text-sm mt-1">
+                      Add some items to get started!
+                    </p>
                   </div>
                 ) : (
-                  cart.map(item => (
+                  cart.map((item) => (
                     <motion.div
                       key={item.id}
                       initial={{ opacity: 0, x: -20 }}
@@ -544,7 +593,9 @@ export default function MenuPage() {
                       className="bg-blue-50 rounded-lg p-3 flex justify-between items-center border border-blue-200"
                     >
                       <div className="flex-1">
-                        <p className="font-semibold text-gray-900 text-sm">{item.name}</p>
+                        <p className="font-semibold text-gray-900 text-sm">
+                          {item.name}
+                        </p>
                         <p className="text-blue-600 font-medium text-xs">
                           ₹{item.price} × {item.quantity}
                         </p>
@@ -576,7 +627,6 @@ export default function MenuPage() {
                 )}
               </div>
 
-              {/* Footer */}
               {cart.length > 0 && (
                 <div className="p-4 bg-green-50 border-t">
                   <div className="flex justify-between text-lg font-bold mb-4">

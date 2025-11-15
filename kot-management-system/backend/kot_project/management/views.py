@@ -477,7 +477,7 @@ class SubCategoryViewSet(viewsets.ModelViewSet):
 
 class RestaurantTableViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for managing restaurant tables
+    ViewSet for managing restaurant tables 
     """
     queryset = RestaurantTable.objects.filter(is_active=True).order_by('table_number')
     serializer_class = RestaurantTableSerializer
@@ -486,7 +486,7 @@ class RestaurantTableViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         """Soft delete implementation"""
         instance.is_active = False
-        instance.save()        
+        instance.save()
 
 class OrderHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Order.objects.select_related('table').prefetch_related('items').order_by('-created_at')

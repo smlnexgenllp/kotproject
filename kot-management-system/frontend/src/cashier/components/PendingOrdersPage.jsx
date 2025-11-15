@@ -2,16 +2,16 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  ArrowLeft, 
-  Printer, 
-  CheckCircle, 
-  Clock, 
-  AlertCircle, 
+import {
+  ArrowLeft,
+  Printer,
+  CheckCircle,
+  Clock,
+  AlertCircle,
   Coffee,
   DollarSign, // Added DollarSign import
   CreditCard, // Added CreditCard import
-  Smartphone // Added Smartphone import
+  Smartphone, // Added Smartphone import
 } from "lucide-react";
 import API from "../../api";
 import Sidebar from "./Sidebar";
@@ -61,8 +61,13 @@ const PendingOrderCard = ({ order, onPaid, onPrint }) => {
       {/* Items */}
       <div className="p-5 space-y-2 max-h-48 overflow-y-auto">
         {order.items.map((item, i) => (
-          <div key={i} className="flex justify-between text-gray-800 font-medium">
-            <span>{item.quantity} × {item.name}</span>
+          <div
+            key={i}
+            className="flex justify-between text-gray-800 font-medium"
+          >
+            <span>
+              {item.quantity} × {item.name}
+            </span>
             <span className="text-blue-700 font-semibold">
               ₹{safeFixed(item.price * item.quantity)}
             </span>
@@ -74,12 +79,16 @@ const PendingOrderCard = ({ order, onPaid, onPrint }) => {
       <div className="bg-gray-50 p-5 border-t-2 border-dashed border-gray-300">
         <div className="flex justify-between text-xl font-bold text-gray-900 mb-3">
           <span>Total</span>
-          <span className="text-blue-700">₹{safeFixed(order.total_amount)}</span>
+          <span className="text-blue-700">
+            ₹{safeFixed(order.total_amount)}
+          </span>
         </div>
         <div className="bg-white rounded-xl p-4 border border-gray-200">
           <div className="flex justify-between text-lg font-bold">
             <span className="text-green-700">Received</span>
-            <span className="text-green-600">₹{safeFixed(order.received_amount)}</span>
+            <span className="text-green-600">
+              ₹{safeFixed(order.received_amount)}
+            </span>
           </div>
           {parseFloat(order.balance_amount) > 0 && (
             <div className="flex justify-between text-lg font-bold mt-3 text-orange-700">
@@ -128,8 +137,8 @@ const PendingOrdersPage = () => {
       }
     };
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const fetchPendingOrders = async () => {
@@ -137,7 +146,7 @@ const PendingOrdersPage = () => {
       setError("");
       const res = await API.get(API_URL);
       const allOrders = res.data;
-      const pending = allOrders.filter(o => o.status === "pending");
+      const pending = allOrders.filter((o) => o.status === "pending");
       setPendingOrders(pending);
     } catch (err) {
       setError("Failed to load pending orders");
@@ -180,17 +189,30 @@ const PendingOrdersPage = () => {
           <p>Order #${order.order_id}</p>
           <p>${new Date(order.created_at).toLocaleString()}</p>
         </div>
-        ${order.items.map(i => `<div class="item"><span>${i.quantity}x ${i.name}</span><span>₹${safeFixed(i.price * i.quantity)}</span></div>`).join("")}
+        ${order.items
+          .map(
+            (i) =>
+              `<div class="item"><span>${i.quantity}x ${
+                i.name
+              }</span><span>₹${safeFixed(i.price * i.quantity)}</span></div>`
+          )
+          .join("")}
         <div class="total">
           <div style="display:flex;justify-content:space-between">
             <span>TOTAL</span><span>₹${safeFixed(order.total_amount)}</span>
           </div>
           <div style="display:flex;justify-content:space-between;margin-top:8px">
-            <span>RECEIVED</span><span>₹${safeFixed(order.received_amount)}</span>
+            <span>RECEIVED</span><span>₹${safeFixed(
+              order.received_amount
+            )}</span>
           </div>
-          ${parseFloat(order.balance_amount) > 0 ? `<div style="display:flex;justify-content:space-between;margin-top:8px;color:#d00">
+          ${
+            parseFloat(order.balance_amount) > 0
+              ? `<div style="display:flex;justify-content:space-between;margin-top:8px;color:#d00">
             <span>CHANGE</span><span>₹${safeFixed(order.balance_amount)}</span>
-          </div>` : ""}
+          </div>`
+              : ""
+          }
         </div>
         <div class="footer"><p>Thank You!</p><p>Payment: ${order.payment_mode.toUpperCase()}</p></div>
       </body></html>
@@ -211,8 +233,8 @@ const PendingOrdersPage = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
-        <motion.div 
-          animate={{ rotate: 360 }} 
+        <motion.div
+          animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
         >
           <Coffee className="text-blue-700" size={64} />
@@ -223,9 +245,9 @@ const PendingOrdersPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex">
-      <Sidebar 
-        active="pending" 
-        onLogout={handleLogout} 
+      <Sidebar
+        active="pending"
+        onLogout={handleLogout}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
@@ -238,10 +260,11 @@ const PendingOrdersPage = () => {
               <button
                 onClick={toggleSidebar}
                 className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-              </button>
+              ></button>
               <div>
-                <h1 className="text-xl font-bold text-blue-900">Pending Orders</h1>
+                <h1 className="text-xl font-bold text-blue-900">
+                  Pending Orders
+                </h1>
                 <p className="text-gray-600 text-sm">Manage payments</p>
               </div>
             </div>
@@ -251,11 +274,15 @@ const PendingOrdersPage = () => {
           </div>
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-7xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-7xl mx-auto"
+        >
           {/* Desktop Header */}
           <div className="mb-8 hidden lg:block">
-            <button 
-              onClick={() => navigate('/cashier')}
+            <button
+              onClick={() => navigate("/cashier")}
               className="flex items-center gap-2 text-blue-700 hover:text-blue-900 mb-4 transition-colors"
             >
               <ArrowLeft size={20} />
@@ -263,8 +290,12 @@ const PendingOrdersPage = () => {
             </button>
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-4xl font-extrabold text-blue-900">Pending Orders</h1>
-                <p className="text-gray-700 mt-2">Manage and process pending payments</p>
+                <h1 className="text-4xl font-extrabold text-blue-900">
+                  Pending Orders
+                </h1>
+                <p className="text-gray-700 mt-2">
+                  Manage and process pending payments
+                </p>
               </div>
               <div className="bg-orange-100 text-orange-800 px-4 py-2 rounded-full font-semibold">
                 {pendingOrders.length} Pending
@@ -284,13 +315,20 @@ const PendingOrdersPage = () => {
             <AnimatePresence>
               {pendingOrders.length === 0 ? (
                 <div className="bg-white rounded-2xl shadow-lg p-16 text-center border border-gray-200">
-                  <CheckCircle size={80} className="mx-auto text-green-400 mb-6" />
-                  <h3 className="text-2xl font-bold text-green-900 mb-2">All Clear!</h3>
-                  <p className="text-gray-600">No pending orders at the moment</p>
+                  <CheckCircle
+                    size={80}
+                    className="mx-auto text-green-400 mb-6"
+                  />
+                  <h3 className="text-2xl font-bold text-green-900 mb-2">
+                    All Clear!
+                  </h3>
+                  <p className="text-gray-600">
+                    No pending orders at the moment
+                  </p>
                 </div>
               ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {pendingOrders.map(order => (
+                  {pendingOrders.map((order) => (
                     <PendingOrderCard
                       key={order.order_id}
                       order={order}
