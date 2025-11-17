@@ -108,7 +108,7 @@ function App() {
       <Route
         path="/cashier-wait"
         element={
-          <ProtectedRoute allowedRoles={["cashier", "admin"]}>
+          <ProtectedRoute allowedRoles={["waiter"]}>
             <CashierWait />
           </ProtectedRoute>
         }
