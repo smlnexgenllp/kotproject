@@ -54,9 +54,9 @@ export default function MenuPage() {
           axios.get(API_URL + "categories/"),
         ]);
 
-        const items = itemsRes.data.map((item) => ({
-          id: item.id,
-          food_id: item.id,
+        const items = itemsRes.data.map((item, index) => ({
+          id: item.id ?? index+1,
+          food_id: item.food_id,
           name: item.food_name,
           price: item.price,
           category: item.category?.toLowerCase() || "uncategorized",
