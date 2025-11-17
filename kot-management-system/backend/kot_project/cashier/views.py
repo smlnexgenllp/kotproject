@@ -79,11 +79,11 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
                     return Response({"detail": "Invalid item in cart"}, status=400)
                 order_items.append(
                     OrderItem(
-                        order=order,  
-                        food_id=item.get('food_id'),        # ← SAVE FOOD ID
-                        name=str(item['name']),
-                        quantity=int(item['quantity']),
-                        price=float(item['price'])
+                       order=order,
+                       food_id=item.get('food_id'),        # ← SAVE FOOD ID
+                       name=str(item['name']),
+                       quantity=int(item['quantity']),
+                       price=float(item['price'])
                     )
                 )
             OrderItem.objects.bulk_create(order_items)
