@@ -16,7 +16,7 @@ import {
 import API from "../../api";
 import Sidebar from "./Sidebar";
 
-const API_URL = "cashier-orders/";
+const API_URL = "/cashier-orders/";
 
 const safeFixed = (value) => {
   const num = parseFloat(value);
@@ -162,14 +162,77 @@ const PendingOrdersPage = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const markPaid = async (orderId) => {
-    try {
-      await API.post(`${API_URL}${orderId}/mark_paid/`);
+  const printSeparateKOT = (order, items, title) => {
+     console.log("PRINT FUNCTION CALLED FOR:", title); 
+  const printWindow = window.open("", "", "width=380,height=600");
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html><head><title>${title} - T${order.table_number}</title>
+    <style>
+      body {font-family:'Courier New',monospace;padding:15px;font-size:14px;margin:0;}
+      .header{text-align:center;border-bottom:2px dashed #000;padding-bottom:10px;margin-bottom:10px;}
+      .item{display:flex;justify-content:space-between;margin:8px 0;}
+      .footer{margin-top:20px;text-align:center;font-size:12px;}
+      @media print{body{margin:0;}}
+    </style></head><body>
+      <div class="header">
+        <h2>${title}</h2>
+        <h3>TABLE ${order.table_number}</h3>
+        <p>Order #${order.order_id}</p>
+        <p>${new Date(order.created_at).toLocaleString()}</p>
+      </div>
+
+      ${items
+        .map(
+          (i) =>
+            `<div class="item"><span>${i.quantity} × ${i.name}</span><span>₹${safeFixed(
+              i.price * i.quantity
+            )}</span></div>`
+        )
+        .join("")}
+
+      <div class="footer">
+        <p>Printed for ${title}</p>
+      </div>
+    </body></html>
+  `);
+
+  printWindow.document.close();
+  setTimeout(() => printWindow.print(), 300);
+};
+const markPaid = async (orderId) => {
+  try {
+    const order = pendingOrders.find(o => o.order_id === orderId);
+    if (!order) return;
+     await API.post(`${API_URL}${orderId}/mark_paid/`);
       fetchPendingOrders();
-    } catch (err) {
-      alert("Failed to mark as paid");
+
+    const foodItems = order.items.filter(i => i.category === "food");
+    const cafeItems = order.items.filter(i => i.category === "cafe");
+
+    // PRINT FOOD
+    if (foodItems.length > 0) {
+      printSeparateKOT(order, foodItems, "FOOD SECTION");
+      await new Promise(r => setTimeout(r, 500)); // <-- Delay
     }
-  };
+
+    // PRINT CAFE
+    if (cafeItems.length > 0) {
+      printSeparateKOT(order, cafeItems, "CAFE SECTION");
+      await new Promise(r => setTimeout(r, 500)); // <-- Delay
+    }
+
+    
+  } catch (err) {
+    console.error("Mark paid error:", err);
+    
+  }
+};
+
+
+
+
 
   const printKOT = (order) => {
     const printWindow = window.open("", "", "width=380,height=600");
@@ -220,6 +283,9 @@ const PendingOrdersPage = () => {
     printWindow.document.close();
     setTimeout(() => printWindow.print(), 500);
   };
+
+ 
+
 
   const handleLogout = () => {
     localStorage.clear();

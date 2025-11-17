@@ -41,23 +41,41 @@ const CompletedOrdersPage = () => {
   const navigate = useNavigate();
 
   // ────── FETCH ──────
-  const fetchCompletedOrders = async () => {
-    try {
-      const res = await API.get(API_URL);
-      const allOrders = res.data;
+  // ────── FETCH ──────
+const fetchCompletedOrders = async () => {
+  try {
+    const res = await API.get(API_URL);
+    const allOrders = res.data;
 
-      // Only paid + paid_at (and now we also expect waiter_name & items)
-      const completed = allOrders.filter(
-        (o) => o.status === "paid" && o.paid_at
-      );
-      setCompletedOrders(completed);
-      applyFilters(completed, dateFilter, paymentFilter);
-    } catch (err) {
-      console.error("Failed to load completed orders", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const completed = allOrders
+      .filter((o) => o.status === "paid" && o.paid_at)
+      .map((order) => {
+        let items = [];
+
+        if (typeof order.items === "string") {
+          try {
+            items = JSON.parse(order.items);
+          } catch (e) {
+            console.warn("Failed to parse items JSON", order.items);
+            items = [];
+          }
+        } else if (Array.isArray(order.items)) {
+          items = order.items;
+        } else if (order.items && typeof order.items === "object") {
+          items = Object.values(order.items);
+        }
+
+        return { ...order, items };
+      });
+
+    setCompletedOrders(completed);
+    applyFilters(completed, dateFilter, paymentFilter);
+  } catch (err) {
+    console.error("Failed to load completed orders", err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ────── FILTERS ──────
   const applyFilters = (orders, dateF, payF) => {

@@ -54,9 +54,9 @@ export default function MenuPage() {
           axios.get(API_URL + "categories/"),
         ]);
 
-        const items = itemsRes.data.map((item) => ({
-          id: item.id,
-          food_id: item.id,
+        const items = itemsRes.data.map((item, index) => ({
+          id: item.id ?? index + 1,
+          food_id: item.food_id,
           name: item.food_name,
           price: item.price,
           category: item.category?.toLowerCase() || "uncategorized",
@@ -167,58 +167,47 @@ export default function MenuPage() {
     return null;
   };
 
-  const handleProceed = async () => {
-    if (!tableNumber.trim()) {
-      setShowTableModal(true);
-      return;
-    }
-    if (cart.length === 0) {
-      alert("Cart is empty!");
-      return;
-    }
+ const handleProceed = async () => {
+  if (!tableNumber.trim()) {
+    setShowTableModal(true);
+    return;
+  }
+  if (cart.length === 0) {
+    alert("Cart is empty!");
+    return;
+  }
 
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (!user.id) {
-      alert("Waiter not logged in!");
-      return;
-    }
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  if (!user.id) {
+    alert("Waiter not logged in!");
+    return;
+  }
 
-    const orderData = {
-      tableNumber: parseInt(tableNumber),
-      total: total,
-      cart: cart.map((item) => ({
-        food_id: item.food_id,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-      })),
-      paymentMode: "cash",
-      received_amount: total,
-      waiter_id: user.id,
-    };
-
-    try {
-      const response = await axios.post(
-        "http://127.0.0.1:8000/api/cashier-orders/create_order/",
-        orderData,
-        { headers: { "Content-Type": "application/json" } }
-      );
-
-      navigate("/payment", {
-        state: {
-          tableNumber,
-          cart,
-          total,
-          orderId: response.data.order_id,
-          waiter_name: response.data.waiter_name,
-        },
-      });
-    } catch (err) {
-      const msg = err.response?.data?.detail || err.message;
-      console.error("Order creation failed:", err);
-      alert(`Failed to create order: ${msg}`);
-    }
+  const orderData = {
+    tableNumber: parseInt(tableNumber),
+    total: total,
+    cart: cart.map((item) => ({
+      food_id: item.food_id,
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+    })),
+    paymentMode: "cash",
+    received_amount: total,
+    waiter_id: user.id,
   };
+
+  navigate("/payment", {
+    state: {
+      tableNumber,
+      cart,
+      total,
+      orderData,  
+      waiter_name: user.name || "",
+    },
+  });
+};
+
 
   if (loading)
     return (
