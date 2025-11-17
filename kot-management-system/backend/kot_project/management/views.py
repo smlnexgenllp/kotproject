@@ -16,6 +16,8 @@ from django.shortcuts import get_object_or_404
 from .serializers import FoodItemSerializer,RestaurantTableSerializer,SubCategorySerializer
 from cashier.models import Order, OrderItem
 from django.db.models import Q
+from django.http import HttpResponse
+import csv
 
 logger = logging.getLogger("otp_sender")
 
@@ -497,46 +499,48 @@ class RestaurantTableViewSet(viewsets.ModelViewSet):
         return Response(list(tables))
 
 class OrderHistoryViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Order.objects.select_related('table').prefetch_related('items').order_by('-created_at')
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        return Order.objects.select_related('table').prefetch_related('items').order_by('-created_at')
+        # Remove 'table' and use 'waiter' instead
+        return Order.objects.select_related('waiter').prefetch_related('items').order_by('-created_at')
 
     def list(self, request, *args, **kwargs):
-        qs = self.get_queryset()
-        # ... your existing filter logic here ...
-        # (same as in download_csv)
+        try:
+            qs = self.get_queryset()
+            qs = self.apply_filters(qs, request)
+            
+            orders = []
+            for order in qs:
+                orders.append({
+                    "order_id": order.order_id,
+                    "table_number": order.table_number,
+                    "total_amount": str(order.total_amount),
+                    "received_amount": str(order.received_amount),
+                    "balance_amount": str(order.balance_amount),
+                    "payment_mode": order.payment_mode,
+                    "status": order.status,
+                    "created_at": order.created_at.isoformat(),
+                    "paid_at": order.paid_at.isoformat() if order.paid_at else None,
+                    # Include waiter information if needed
+                    "waiter": order.waiter.username if order.waiter else None,
+                    "items": [
+                        {
+                            "name": item.name,
+                            "quantity": item.quantity,
+                            "price": str(item.price),
+                            "subtotal": str(item.subtotal()),
+                        }
+                        for item in order.items.all()
+                    ],
+                })
+            return Response({"orders": orders})
+        except Exception as e:
+            print(f"Error in list view: {str(e)}")
+            return Response({"error": "Internal server error"}, status=500)
 
-        orders = []
-        for order in qs:
-            orders.append({
-                "order_id": order.order_id,
-                "table_number": order.table_number,
-                "total_amount": str(order.total_amount),
-                "received_amount": str(order.received_amount),
-                "balance_amount": str(order.balance_amount),
-                "payment_mode": order.payment_mode,
-                "status": order.status,
-                "created_at": order.created_at.isoformat(),
-                "paid_at": order.paid_at.isoformat() if order.paid_at else None,
-                "items": [
-                    {
-                        "name": item.name,
-                        "quantity": item.quantity,
-                        "price": str(item.price),
-                        "subtotal": str(item.subtotal()),
-                    }
-                    for item in order.items.all()
-                ],
-            })
-        return Response({"orders": orders})
-
-    @action(detail=False, methods=['get'], url_path='download-csv')
-    def download_csv(self, request):
-        qs = self.get_queryset()
-
-        # === FILTERS ===
+    def apply_filters(self, qs, request):
+        """Apply filters to queryset"""
         table_number = request.query_params.get('table_number')
         status = request.query_params.get('status')
         payment_mode = request.query_params.get('payment_mode')
@@ -578,7 +582,16 @@ class OrderHistoryViewSet(viewsets.ReadOnlyModelViewSet):
         elif yesterday == '1':
             qs = qs.filter(created_at__date=timezone.now().date() - timedelta(days=1))
 
-        # === CSV ===
+        return qs
+
+    @action(detail=False, methods=['get'], url_path='download-csv')
+    def download_csv(self, request):
+        qs = self.get_queryset()
+        qs = self.apply_filters(qs, request)
+
+        # IMPORTANT: Select + prefetch to avoid N+1 queries
+        qs = qs.select_related('waiter').prefetch_related('items').iterator(chunk_size=1000)
+
         response = HttpResponse(content_type='text/csv')
         filename = f"order_history_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
@@ -586,23 +599,26 @@ class OrderHistoryViewSet(viewsets.ReadOnlyModelViewSet):
         writer = csv.writer(response)
         writer.writerow([
             'Order ID', 'Table', 'Items', 'Total (₹)', 'Received (₹)', 'Balance (₹)',
-            'Payment Mode', 'Status', 'Created At', 'Paid At'
+            'Payment Mode', 'Status', 'Waiter', 'Created At', 'Paid At'
         ])
 
-        for order in qs.iterator():
+        for order in qs:
+            # Build items string safely using prefetched data
             items_str = '; '.join(
                 f"{item.quantity}x {item.name} @ ₹{item.price}"
-                for item in order.items.all()
+                for item in order.items.all()  # Now safe because prefetched
             )
+
             writer.writerow([
                 order.order_id,
-                order.table_number,
+                order.table_number or '',
                 items_str,
-                order.total_amount,
-                order.received_amount,
-                order.balance_amount,
-                order.payment_mode.capitalize(),
-                order.status.capitalize(),
+                str(order.total_amount or 0),
+                str(order.received_amount or 0),
+                str(order.balance_amount or 0),
+                (order.payment_mode or '').capitalize(),
+                (order.status or '').capitalize(),
+                order.waiter.username if order.waiter else 'No Waiter',
                 order.created_at.strftime('%Y-%m-%d %H:%M:%S'),
                 order.paid_at.strftime('%Y-%m-%d %H:%M:%S') if order.paid_at else '-',
             ])
