@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useRef } from "react";
 import {
   CreditCard,
   Wallet,
@@ -18,6 +19,7 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(false);
   const [cashAmount, setCashAmount] = useState("");
   const [showCashInput, setShowCashInput] = useState(false);
+  
 
   // ────── ONLINE PAYMENT STATE ──────
   const [showOnlineOptions, setShowOnlineOptions] = useState(false);
@@ -31,9 +33,10 @@ export default function PaymentPage() {
   const total = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const received = parseFloat(cashAmount) || 0;
   const balance = received - total;
-
+const submittingRef = useRef(false);
   const handlePayment = async (mode, method = null) => {
-    if (loading) return;
+    if (submittingRef.current) return;
+  submittingRef.current = true;
 
     // ────── PRESERVE FULL CART WITH food_id & name ──────
     const fullCart = cart.map((item) => ({

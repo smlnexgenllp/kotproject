@@ -2,11 +2,34 @@
 from rest_framework import serializers
 from .models import Order, OrderItem
 from decimal import Decimal
+from management.models import FoodItem
+
 
 class OrderItemSerializer(serializers.ModelSerializer):
+    category = serializers.SerializerMethodField()
+
     class Meta:
         model = OrderItem
-        fields = ('name', 'quantity', 'price')
+        fields = [
+            "id",
+            "food_id",
+            "name",
+            "price",
+            "quantity",
+            "category",
+        ]
+
+    def get_category(self, obj):
+        """
+        Fetch category from FoodItem using food_id,
+        return None if food missing.
+        """
+        if not obj.food_id:
+            return None
+        
+        food = FoodItem.objects.filter(food_id=obj.food_id).first()
+        return food.category if food else None
+
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
