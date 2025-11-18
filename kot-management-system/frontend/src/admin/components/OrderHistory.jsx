@@ -26,13 +26,14 @@ const OrderHistory = () => {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const response = await API.get('/orders'); // baseURL + 'orders/' → /api/orders/
+        const response = await API.get('/orders '); // Note the trailing slash
         const allOrders = response.data.orders || [];
         setOrders(allOrders);
         applyViewAndFilters(allOrders, viewMode);
       } catch (err) {
-        setError('Failed to fetch orders');
-        console.error(err);
+        console.error('Full error details:', err);
+        console.error('Error response:', err.response);
+        setError(`Failed to fetch orders: ${err.response?.data?.error || err.message}`);
       } finally {
         setLoading(false);
       }
@@ -101,43 +102,46 @@ const OrderHistory = () => {
 
   // CSV DOWNLOAD – NO REDIRECT
   const handleDownloadCSV = async () => {
-    const params = new URLSearchParams();
-    if (filters.tableNumber) params.append('table_number', filters.tableNumber);
-    if (filters.status) params.append('status', filters.status);
-    if (filters.paymentMode) params.append('payment_mode', filters.paymentMode);
-    if (filters.dateFrom) params.append('date_from', filters.dateFrom);
-    if (filters.dateTo) params.append('date_to', filters.dateTo);
-    if (filters.search) params.append('search', filters.search);
-    if (viewMode === 'today') params.append('today', '1');
-    if (viewMode === 'yesterday') params.append('yesterday', '1');
+  try {
+    const params = {
+      table_number: filters.tableNumber || undefined,
+      status: filters.status || undefined,
+      payment_mode: filters.paymentMode || undefined,
+      date_from: filters.dateFrom || undefined,
+      date_to: filters.dateTo || undefined,
+      search: filters.search || undefined,
+    };
 
-    // Correct URL: baseURL + 'orders/download-csv/'
-    const url = `orders/download-csv/?${params.toString()}`;
+    if (viewMode === 'today') params.today = '1';
+    if (viewMode === 'yesterday') params.yesterday = '1';
 
-    try {
-      const response = await API.get(url, { responseType: 'blob' }); // Important!
-      const blob = new Blob([response.data], { type: 'text/csv' });
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
+    const response = await API.get('/orders/download-csv/', {
+      params,
+      responseType: 'blob',
+      timeout: 60000,
+    });
 
-      // Extract filename from header
-      const disposition = response.headers?.['content-disposition'] || response.headers?.['Content-Disposition'];
-      let filename = `order_history_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv`;
-      if (disposition && disposition.includes('filename=')) {
-        filename = disposition.split('filename=')[1].replace(/["']/g, '');
-      }
+    // Create download link
+    const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.setAttribute('download', `order_history_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(downloadUrl);
 
-      a.setAttribute('download', filename);
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(downloadUrl);
-    } catch (err) {
-      console.error('CSV Download Failed:', err);
-      alert('Failed to download CSV. Check console.');
+  } catch (err) {
+    console.error('CSV Download Failed:', err);
+    if (err.response?.status === 404) {
+      alert('CSV endpoint not working. Check server logs.');
+    } else if (err.response?.status >= 500) {
+      alert('Server error while generating CSV. Check backend logs.');
+    } else {
+      alert('Failed to download CSV. Please try again.');
     }
-  };
+  }
+};
 
   if (loading) {
     return (
@@ -160,25 +164,22 @@ const OrderHistory = () => {
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setQuickView('today')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              viewMode === 'today' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${viewMode === 'today' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
           >
             Today
           </button>
           <button
             onClick={() => setQuickView('yesterday')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              viewMode === 'yesterday' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${viewMode === 'yesterday' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
           >
             Yesterday
           </button>
           <button
             onClick={() => setQuickView('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              viewMode === 'all' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${viewMode === 'all' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
           >
             All History
           </button>
@@ -276,11 +277,10 @@ const OrderHistory = () => {
                   <td className="py-3 px-4 text-sm">₹{order.balance_amount}</td>
                   <td className="py-3 px-4 text-sm capitalize">{order.payment_mode}</td>
                   <td className="py-3 px-4">
-                    <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                      order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      order.status === 'paid' ? 'bg-green-100 text-green-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        order.status === 'paid' ? 'bg-green-100 text-green-800' :
+                          'bg-red-100 text-red-800'
+                      }`}>
                       {order.status}
                     </span>
                   </td>

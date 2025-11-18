@@ -9,9 +9,13 @@ import {
   Clock,
   AlertCircle,
   Coffee,
-  DollarSign, // Added DollarSign import
-  CreditCard, // Added CreditCard import
-  Smartphone, // Added Smartphone import
+  DollarSign,
+  CreditCard,
+  Smartphone,
+  X,
+  ChevronDown,
+  ChevronUp,
+  Search, // Added Search icon
 } from "lucide-react";
 import API from "../../api";
 import Sidebar from "./Sidebar";
@@ -32,7 +36,18 @@ const PaymentIcon = ({ mode }) => {
   return icons[mode] || null;
 };
 
-const PendingOrderCard = ({ order, onPaid, onPrint }) => {
+const PendingOrderCard = ({ order, onPaid, onPrint, onCancel }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isCanceling, setIsCanceling] = useState(false);
+
+  const handleCancel = async () => {
+    if (window.confirm(`Are you sure you want to cancel order #${order.order_id} for Table ${order.table_number}?`)) {
+      setIsCanceling(true);
+      await onCancel(order.order_id);
+      setIsCanceling(false);
+    }
+  };
+
   return (
     <motion.div
       layout
@@ -42,81 +57,123 @@ const PendingOrderCard = ({ order, onPaid, onPrint }) => {
       whileHover={{ scale: 1.02 }}
       className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200"
     >
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white p-5">
+      {/* Compact Header */}
+      <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white p-4">
         <div className="flex justify-between items-center">
-          <h3 className="text-2xl font-bold">Table {order.table_number}</h3>
-          <div className="flex items-center gap-2">
-            <PaymentIcon mode={order.payment_mode} />
-            <span className="bg-white/25 px-3 py-1 rounded-full text-sm font-semibold">
-              #{order.order_id}
-            </span>
-          </div>
-        </div>
-        <p className="text-blue-100 text-sm mt-1">
-          {new Date(order.created_at).toLocaleTimeString()}
-        </p>
-      </div>
-
-      {/* Items */}
-      <div className="p-5 space-y-2 max-h-48 overflow-y-auto">
-        {order.items.map((item, i) => (
-          <div
-            key={i}
-            className="flex justify-between text-gray-800 font-medium"
-          >
-            <span>
-              {item.quantity} × {item.name}
-            </span>
-            <span className="text-blue-700 font-semibold">
-              ₹{safeFixed(item.price * item.quantity)}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {/* Payment Summary */}
-      <div className="bg-gray-50 p-5 border-t-2 border-dashed border-gray-300">
-        <div className="flex justify-between text-xl font-bold text-gray-900 mb-3">
-          <span>Total</span>
-          <span className="text-blue-700">
-            ₹{safeFixed(order.total_amount)}
-          </span>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-gray-200">
-          <div className="flex justify-between text-lg font-bold">
-            <span className="text-green-700">Received</span>
-            <span className="text-green-600">
-              ₹{safeFixed(order.received_amount)}
-            </span>
-          </div>
-          {parseFloat(order.balance_amount) > 0 && (
-            <div className="flex justify-between text-lg font-bold mt-3 text-orange-700">
-              <span>Change</span>
-              <span>₹{safeFixed(order.balance_amount)}</span>
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-lg">
+              <PaymentIcon mode={order.payment_mode} />
             </div>
-          )}
+            <div>
+              <h3 className="text-xl font-bold">Table {order.table_number}</h3>
+              <p className="text-blue-100 text-sm">
+                #{order.order_id} • {new Date(order.created_at).toLocaleTimeString()}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="bg-white/25 px-3 py-1 rounded-full text-sm font-semibold">
+              ₹{safeFixed(order.total_amount)}
+            </span>
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+            >
+              {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Expandable Content */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            {/* Items */}
+            <div className="p-4 space-y-2 max-h-48 overflow-y-auto border-b border-gray-100">
+              {order.items.map((item, i) => (
+                <div
+                  key={i}
+                  className="flex justify-between text-gray-800 font-medium text-sm"
+                >
+                  <span className="flex-1 truncate mr-2">
+                    {item.quantity} × {item.name}
+                  </span>
+                  <span className="text-blue-700 font-semibold whitespace-nowrap">
+                    ₹{safeFixed(item.price * item.quantity)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Payment Summary */}
+            <div className="p-4 bg-gray-50">
+              <div className="bg-white rounded-xl p-3 border border-gray-200 space-y-2">
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Total</span>
+                  <span className="text-blue-700">₹{safeFixed(order.total_amount)}</span>
+                </div>
+                <div className="flex justify-between text-green-700 font-semibold">
+                  <span>Received</span>
+                  <span>₹{safeFixed(order.received_amount)}</span>
+                </div>
+                {parseFloat(order.balance_amount) > 0 && (
+                  <div className="flex justify-between text-orange-700 font-semibold">
+                    <span>Change</span>
+                    <span>₹{safeFixed(order.balance_amount)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Actions */}
-      <div className="p-5 bg-gradient-to-r from-gray-50 to-gray-100 flex gap-3">
+      <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 flex gap-2">
         <motion.button
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => onPaid(order.order_id)}
-          className="flex-1 bg-gradient-to-r from-green-600 to-emerald-700 text-white py-4 rounded-xl font-bold text-lg shadow-md flex items-center justify-center gap-2"
+          className="flex-1 bg-gradient-to-r from-green-600 to-emerald-700 text-white py-3 rounded-xl font-bold text-sm shadow-md flex items-center justify-center gap-2"
         >
-          <CheckCircle size={22} />
-          Mark as Paid
+          <CheckCircle size={18} />
+          Mark Paid
         </motion.button>
+        
         <motion.button
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => onPrint(order)}
-          className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-4 rounded-xl shadow-md"
+          className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-3 rounded-xl shadow-md flex items-center justify-center"
+          title="Print KOT"
         >
-          <Printer size={22} />
+          <Printer size={18} />
+        </motion.button>
+        
+        <motion.button
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={handleCancel}
+          disabled={isCanceling}
+          className="bg-gradient-to-r from-red-600 to-red-700 text-white p-3 rounded-xl shadow-md flex items-center justify-center disabled:opacity-50"
+          title="Cancel Order"
+        >
+          {isCanceling ? (
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            >
+              <Clock size={18} />
+            </motion.div>
+          ) : (
+            <X size={18} />
+          )}
         </motion.button>
       </div>
     </motion.div>
@@ -125,6 +182,8 @@ const PendingOrderCard = ({ order, onPaid, onPrint }) => {
 
 const PendingOrdersPage = () => {
   const [pendingOrders, setPendingOrders] = useState([]);
+  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -148,6 +207,7 @@ const PendingOrdersPage = () => {
       const allOrders = res.data;
       const pending = allOrders.filter((o) => o.status === "pending");
       setPendingOrders(pending);
+      setFilteredOrders(pending); // Initialize filtered orders with all pending orders
     } catch (err) {
       setError("Failed to load pending orders");
       console.error(err);
@@ -156,6 +216,18 @@ const PendingOrdersPage = () => {
     }
   };
 
+  // Filter orders based on search term
+  useEffect(() => {
+    if (searchTerm.trim() === "") {
+      setFilteredOrders(pendingOrders);
+    } else {
+      const filtered = pendingOrders.filter(order => 
+        order.order_id.toString().includes(searchTerm.trim())
+      );
+      setFilteredOrders(filtered);
+    }
+  }, [searchTerm, pendingOrders]);
+
   useEffect(() => {
     fetchPendingOrders();
     const interval = setInterval(fetchPendingOrders, 5000);
@@ -163,76 +235,81 @@ const PendingOrdersPage = () => {
   }, []);
 
   const printSeparateKOT = (order, items, title) => {
-     console.log("PRINT FUNCTION CALLED FOR:", title); 
-  const printWindow = window.open("", "", "width=380,height=600");
+    console.log("PRINT FUNCTION CALLED FOR:", title); 
+    const printWindow = window.open("", "", "width=380,height=600");
 
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html><head><title>${title} - T${order.table_number}</title>
-    <style>
-      body {font-family:'Courier New',monospace;padding:15px;font-size:14px;margin:0;}
-      .header{text-align:center;border-bottom:2px dashed #000;padding-bottom:10px;margin-bottom:10px;}
-      .item{display:flex;justify-content:space-between;margin:8px 0;}
-      .footer{margin-top:20px;text-align:center;font-size:12px;}
-      @media print{body{margin:0;}}
-    </style></head><body>
-      <div class="header">
-        <h2>${title}</h2>
-        <h3>TABLE ${order.table_number}</h3>
-        <p>Order #${order.order_id}</p>
-        <p>${new Date(order.created_at).toLocaleString()}</p>
-      </div>
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html><head><title>${title} - T${order.table_number}</title>
+      <style>
+        body {font-family:'Courier New',monospace;padding:15px;font-size:14px;margin:0;}
+        .header{text-align:center;border-bottom:2px dashed #000;padding-bottom:10px;margin-bottom:10px;}
+        .item{display:flex;justify-content:space-between;margin:8px 0;}
+        .footer{margin-top:20px;text-align:center;font-size:12px;}
+        @media print{body{margin:0;}}
+      </style></head><body>
+        <div class="header">
+          <h2>${title}</h2>
+          <h3>TABLE ${order.table_number}</h3>
+          <p>Order #${order.order_id}</p>
+          <p>${new Date(order.created_at).toLocaleString()}</p>
+        </div>
 
-      ${items
-        .map(
-          (i) =>
-            `<div class="item"><span>${i.quantity} × ${i.name}</span><span>₹${safeFixed(
-              i.price * i.quantity
-            )}</span></div>`
-        )
-        .join("")}
+        ${items
+          .map(
+            (i) =>
+              `<div class="item"><span>${i.quantity} × ${i.name}</span><span>₹${safeFixed(
+                i.price * i.quantity
+              )}</span></div>`
+          )
+          .join("")}
 
-      <div class="footer">
-        <p>Printed for ${title}</p>
-      </div>
-    </body></html>
-  `);
+        <div class="footer">
+          <p>Printed for ${title}</p>
+        </div>
+      </body></html>
+    `);
 
-  printWindow.document.close();
-  setTimeout(() => printWindow.print(), 300);
-};
-const markPaid = async (orderId) => {
-  try {
-    const order = pendingOrders.find(o => o.order_id === orderId);
-    if (!order) return;
-     await API.post(`${API_URL}${orderId}/mark_paid/`);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 300);
+  };
+
+  const markPaid = async (orderId) => {
+    try {
+      const order = pendingOrders.find(o => o.order_id === orderId);
+      if (!order) return;
+      await API.post(`${API_URL}${orderId}/mark_paid/`);
       fetchPendingOrders();
 
-    const foodItems = order.items.filter(i => i.category === "food");
-    const cafeItems = order.items.filter(i => i.category === "cafe");
+      const foodItems = order.items.filter(i => i.category === "food");
+      const cafeItems = order.items.filter(i => i.category === "cafe");
 
-    // PRINT FOOD
-    if (foodItems.length > 0) {
-      printSeparateKOT(order, foodItems, "FOOD SECTION");
-      await new Promise(r => setTimeout(r, 500)); // <-- Delay
+      // PRINT FOOD
+      if (foodItems.length > 0) {
+        printSeparateKOT(order, foodItems, "FOOD SECTION");
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      // PRINT CAFE
+      if (cafeItems.length > 0) {
+        printSeparateKOT(order, cafeItems, "CAFE SECTION");
+        await new Promise(r => setTimeout(r, 500));
+      }
+    } catch (err) {
+      console.error("Mark paid error:", err);
     }
+  };
 
-    // PRINT CAFE
-    if (cafeItems.length > 0) {
-      printSeparateKOT(order, cafeItems, "CAFE SECTION");
-      await new Promise(r => setTimeout(r, 500)); // <-- Delay
+  // Cancel Order Function
+  const cancelOrder = async (orderId) => {
+    try {
+      await API.post(`${API_URL}${orderId}/cancel_order/`);
+      fetchPendingOrders(); // Refresh the list
+    } catch (err) {
+      console.error("Cancel order error:", err);
+      alert("Failed to cancel order. Please try again.");
     }
-
-    
-  } catch (err) {
-    console.error("Mark paid error:", err);
-    
-  }
-};
-
-
-
-
+  };
 
   const printKOT = (order) => {
     const printWindow = window.open("", "", "width=380,height=600");
@@ -283,9 +360,6 @@ const markPaid = async (orderId) => {
     printWindow.document.close();
     setTimeout(() => printWindow.print(), 500);
   };
-
- 
-
 
   const handleLogout = () => {
     localStorage.clear();
@@ -369,6 +443,37 @@ const markPaid = async (orderId) => {
             </div>
           </div>
 
+          {/* Search Bar */}
+          <div className="mb-6">
+            <div className="relative max-w-md">
+              <Search
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-600"
+                size={20}
+              />
+              <input
+                type="text"
+                placeholder="Search by Order ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-12 pr-6 py-3 rounded-xl border-2 border-blue-200 focus:border-blue-500 outline-none text-base shadow-lg bg-white"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+            {searchTerm && (
+              <p className="text-sm text-gray-600 mt-2">
+                Showing {filteredOrders.length} of {pendingOrders.length} orders
+                {searchTerm && ` for order ID: ${searchTerm}`}
+              </p>
+            )}
+          </div>
+
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 flex items-center gap-2">
               <AlertCircle size={20} />
@@ -379,27 +484,48 @@ const markPaid = async (orderId) => {
           {/* Pending Orders Grid */}
           <div>
             <AnimatePresence>
-              {pendingOrders.length === 0 ? (
+              {filteredOrders.length === 0 ? (
                 <div className="bg-white rounded-2xl shadow-lg p-16 text-center border border-gray-200">
-                  <CheckCircle
-                    size={80}
-                    className="mx-auto text-green-400 mb-6"
-                  />
-                  <h3 className="text-2xl font-bold text-green-900 mb-2">
-                    All Clear!
-                  </h3>
-                  <p className="text-gray-600">
-                    No pending orders at the moment
-                  </p>
+                  {searchTerm ? (
+                    <>
+                      <Search size={80} className="mx-auto text-gray-400 mb-6" />
+                      <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                        No Orders Found
+                      </h3>
+                      <p className="text-gray-600">
+                        No pending orders found for order ID: <strong>"{searchTerm}"</strong>
+                      </p>
+                      <button
+                        onClick={() => setSearchTerm("")}
+                        className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Clear Search
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle
+                        size={80}
+                        className="mx-auto text-green-400 mb-6"
+                      />
+                      <h3 className="text-2xl font-bold text-green-900 mb-2">
+                        All Clear!
+                      </h3>
+                      <p className="text-gray-600">
+                        No pending orders at the moment
+                      </p>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {pendingOrders.map((order) => (
+                  {filteredOrders.map((order) => (
                     <PendingOrderCard
                       key={order.order_id}
                       order={order}
                       onPaid={markPaid}
                       onPrint={printKOT}
+                      onCancel={cancelOrder}
                     />
                   ))}
                 </div>
