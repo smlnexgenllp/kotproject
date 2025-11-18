@@ -1,8 +1,7 @@
 // src/pages/PaymentPage.jsx
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { useRef } from "react";
 import {
   CreditCard,
   Wallet,
@@ -19,12 +18,14 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(false);
   const [cashAmount, setCashAmount] = useState("");
   const [showCashInput, setShowCashInput] = useState(false);
-  
 
-  // ────── ONLINE PAYMENT STATE ──────
+  // ONLINE
   const [showOnlineOptions, setShowOnlineOptions] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState("");
 
+  const submittingRef = useRef(false);
+
+  // redirect safety
   if (!cart || !tableNumber) {
     navigate("/");
     return null;
@@ -33,12 +34,12 @@ export default function PaymentPage() {
   const total = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const received = parseFloat(cashAmount) || 0;
   const balance = received - total;
-const submittingRef = useRef(false);
+
   const handlePayment = async (mode, method = null) => {
     if (submittingRef.current) return;
-  submittingRef.current = true;
+    submittingRef.current = true;
 
-    // ────── PRESERVE FULL CART WITH food_id & name ──────
+    // build full cart
     const fullCart = cart.map((item) => ({
       food_id: item.food_id,
       name: item.name,
@@ -50,49 +51,38 @@ const submittingRef = useRef(false);
       tableNumber: parseInt(tableNumber),
       total,
       paymentMode: mode === "Online" ? method.toLowerCase() : "cash",
-      received_amount: mode === "Offline" ? received : total,
+      received_amount: mode === "Online" ? total : received,
       waiter_id: JSON.parse(localStorage.getItem("user") || "{}").id,
       cart: fullCart,
     };
 
     setLoading(true);
+
     try {
       const res = await axios.post(
         "http://127.0.0.1:8000/api/cashier-orders/create_order/",
         payload
       );
 
-      if (mode === "Online") {
-        // Simulate gateway delay
-        setTimeout(() => {
-          navigate("/success", {
-            state: {
-              tableNumber,
-              total,
-              mode: "Online",
-              method,
-              received: total,
-              balance: 0,
-            },
-          });
-        }, 1500);
-      } else {
-        navigate("/cashier-wait", {
-          state: {
-            orderId: res.data.order_id,
-            tableNumber,
-            total,
-            received,
-            balance: balance > 0 ? balance : 0,
-          },
-        });
-      }
+      //  ✅ SAME FLOW FOR CASH & ONLINE (PENDING ORDER)
+      navigate("/cashier-wait", {
+        state: {
+          orderId: res.data.order_id,
+          tableNumber,
+          total,
+          received: mode === "Online" ? total : received,
+          balance: mode === "Online" ? 0 : balance > 0 ? balance : 0,
+          mode,
+          paymentMethod: method,
+        },
+      });
     } catch (err) {
       setLoading(false);
       alert(
         "Failed to process payment: " +
           (err.response?.data?.detail || err.message)
       );
+      submittingRef.current = false;
     }
   };
 
@@ -105,6 +95,7 @@ const submittingRef = useRef(false);
             Table {tableNumber}
           </h1>
 
+          {/* TOTAL BILL */}
           <div className="bg-gray-50 rounded-2xl p-6 mb-3">
             <div className="text-3xl font-bold text-right text-indigo-600">
               ₹{total}
@@ -112,6 +103,7 @@ const submittingRef = useRef(false);
             <p className="text-gray-600 text-right">Total Bill</p>
           </div>
 
+          {/* CART LIST */}
           <div className="max-h-56 overflow-y-auto bg-gray-50 rounded-2xl p-4 mb-6 space-y-2">
             {cart.map((item) => (
               <div
@@ -134,7 +126,7 @@ const submittingRef = useRef(false);
             ))}
           </div>
 
-          {/* ────── CASH INPUT (Unchanged) ────── */}
+          {/* CASH INPUT */}
           {showCashInput && (
             <div className="mb-6 animate-fadeIn">
               <label className="block text-lg font-semibold mb-3 text-gray-700">
@@ -163,9 +155,9 @@ const submittingRef = useRef(false);
             </div>
           )}
 
-          {/* ────── PAYMENT BUTTONS ────── */}
+          {/* PAYMENT BUTTONS */}
           <div className="space-y-4">
-            {/* ── PAY ONLINE (Enhanced) ── */}
+            {/* PAY ONLINE */}
             <button
               onClick={() => setShowOnlineOptions(true)}
               disabled={loading || showCashInput}
@@ -174,7 +166,7 @@ const submittingRef = useRef(false);
               <CreditCard size={28} /> Pay Online (UPI/Card)
             </button>
 
-            {/* Online Method Selector */}
+            {/* ONLINE OPTIONS */}
             {showOnlineOptions && (
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-5 space-y-4 border border-blue-200">
                 <h3 className="text-lg font-bold text-center text-indigo-700">
@@ -190,8 +182,7 @@ const submittingRef = useRef(false);
                         : "border-gray-300 hover:border-blue-400"
                     }`}
                   >
-                    <Smartphone size={20} />
-                    UPI
+                    <Smartphone size={20} /> UPI
                   </button>
 
                   <button
@@ -202,12 +193,11 @@ const submittingRef = useRef(false);
                         : "border-gray-300 hover:border-indigo-400"
                     }`}
                   >
-                    <CreditCard size={20} />
-                    Card
+                    <CreditCard size={20} /> Card
                   </button>
                 </div>
 
-                {/* Confirm Button */}
+                {/* CONFIRM ONLINE PAYMENT */}
                 <button
                   onClick={() => handlePayment("Online", selectedMethod)}
                   disabled={loading || !selectedMethod}
@@ -218,11 +208,12 @@ const submittingRef = useRef(false);
                   ) : (
                     <>
                       <CheckCircle size={22} />
-                      Confirm & Pay ₹{total.toFixed(2)}
+                      Confirm & Send ₹{total.toFixed(2)} to Cashier
                     </>
                   )}
                 </button>
 
+                {/* BACK */}
                 <button
                   onClick={() => {
                     setShowOnlineOptions(false);
@@ -235,7 +226,7 @@ const submittingRef = useRef(false);
               </div>
             )}
 
-            {/* ── PAY CASH (Unchanged) ── */}
+            {/* PAY CASH */}
             <button
               onClick={() => setShowCashInput(true)}
               disabled={loading || showOnlineOptions}
@@ -244,6 +235,7 @@ const submittingRef = useRef(false);
               <Wallet size={28} /> Pay Cash
             </button>
 
+            {/* CASH CONFIRM */}
             {showCashInput && (
               <button
                 onClick={() => handlePayment("Offline")}

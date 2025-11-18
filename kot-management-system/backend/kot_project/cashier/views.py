@@ -30,8 +30,8 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='create_order')
     def create_order(self, request):
         data = request.data
-        try: 
-            # Validate required fields
+        try:
+        # Validate required fields
             required = ['tableNumber', 'total', 'cart']
             missing = [field for field in required if field not in data]
             if missing:
@@ -40,7 +40,7 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Get waiter
+        # Get waiter
             waiter_id = data.get('waiter_id')
             waiter = None
             if waiter_id:
@@ -49,26 +49,19 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
                 except AdminUser.DoesNotExist:
                     return Response({"detail": "Invalid waiter_id"}, status=400)
 
-            # Determine payment mode
             payment_mode = data.get('paymentMode', 'cash').lower()
-            is_online_payment = payment_mode in ['upi', 'card']
 
-            # Create Order
+        # Always create order as PENDING
             order = Order.objects.create(
                 table_number=int(data['tableNumber']),
                 total_amount=float(data['total']),
                 payment_mode=payment_mode,
-                received_amount=float(data.get('received_amount', data['total'])),
-                status='paid' if is_online_payment else 'pending',  # ← AUTO PAID
+                received_amount=float(data.get('received_amount', 0)),
+                status='pending',
                 waiter=waiter
             )
 
-            # Auto-set paid_at for online payments
-            if is_online_payment:
-                order.paid_at = timezone.now()
-                order.save(update_fields=['paid_at'])  # Skip full save() to avoid balance recalc
-
-            # Create OrderItems
+        # Create OrderItems
             cart = data.get('cart', [])
             if not isinstance(cart, list):
                 return Response({"detail": "cart must be a list"}, status=400)
@@ -80,17 +73,13 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
                 order_items.append(
                     OrderItem(
                         order=order,
-                        food_id=item.get('food_id'),        # ← SAVE FOOD ID
+                        food_id=item.get('food_id'),
                         name=str(item['name']),
                         quantity=int(item['quantity']),
                         price=float(item['price'])
                     )
                 )
             OrderItem.objects.bulk_create(order_items)
-
-            # Recalculate balance only for cash (online has no change)
-            if not is_online_payment:
-                order.save()  # Triggers balance_amount calculation
 
             serializer = OrderSerializer(order)
             return Response(serializer.data, status=status.HTTP_201_CREATED)

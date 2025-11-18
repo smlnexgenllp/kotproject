@@ -9,6 +9,7 @@ export default function OrderSuccess() {
 
   // SAFE DEFAULT VALUES — NO MORE "undefined" ERRORS!
   const {
+     orderId = "N/A",
     tableNumber = "N/A",
     total = 0,
     mode = "Unknown",
@@ -24,6 +25,9 @@ export default function OrderSuccess() {
           <CheckCircle size={64} className="mx-auto mb-4 animate-bounce" />
           <h1 className="text-4xl font-bold">Order Placed Successfully!</h1>
           <p className="text-xl mt-2 opacity-90">Table {tableNumber}</p>
+          <div className="flex justify-between text-lg">
+  <span className="font-semibold text-gray-700">Order ID:{orderId}</span>
+</div>
         </div>
 
         {/* DETAILS */}

@@ -13,7 +13,7 @@ export default function CashierWait() {
       try {
         const res = await axios.get(`http://127.0.0.1:8000/api/cashier-orders/${orderId}/`);
         if (res.data.status === "paid") {
-          navigate("/success", { state: { tableNumber: res.data.table_number, total: res.data.total_amount, mode: "Cash" } });
+          navigate("/success", { state: {orderId, tableNumber: res.data.table_number, total: res.data.total_amount, mode: "Cash" } });
         }
       } catch (err) {}
     };
