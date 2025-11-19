@@ -16,6 +16,7 @@ class Order(models.Model):
         ('paid', 'Paid'),
         ('cancelled', 'Cancelled'),
     ]
+
     waiter = models.ForeignKey(
         AdminUser,
         on_delete=models.SET_NULL,
@@ -32,7 +33,13 @@ class Order(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
     paid_at = models.DateTimeField(null=True, blank=True)
-   
+
+    # Refund fields
+    refunded_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    is_refunded = models.BooleanField(default=False)
+    refund_reason = models.TextField(blank=True, null=True)
+    refunded_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ['-created_at']
         indexes = [
@@ -42,12 +49,20 @@ class Order(models.Model):
         ]
 
     def save(self, *args, **kwargs):
-        # Auto-calculate change
-        self.balance_amount = max(self.received_amount - self.total_amount, 0)
+        from decimal import Decimal
+
+        # Auto-calculate balance (change)
+        self.balance_amount = max(self.received_amount - self.total_amount, Decimal('0'))
 
         # Auto-set paid_at
         if self.status == 'paid' and not self.paid_at:
             self.paid_at = timezone.now()
+
+        # Auto-update refund flag
+        if self.refunded_amount and self.refunded_amount > 0:
+            self.is_refunded = True
+        else:
+            self.is_refunded = False
 
         super().save(*args, **kwargs)
 

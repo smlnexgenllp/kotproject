@@ -15,6 +15,7 @@ import CashierPortal from "./cashier/components/CashierPortal";
 import CashierWait from "./cashier/pages/CashierWait";
 import PendingOrdersPage from "./cashier/components/PendingOrdersPage";
 import CompletedOrdersPage from "./cashier/components/CompletedOrdersPage";
+import WaiterOrderHistory from "./users/components/WaiterOrderHistory";
 
 // ======================================================
 // AUTH HELPERS
@@ -141,7 +142,14 @@ function App() {
           </ProtectedRoute>
         }
       />
-
+        <Route
+        path="/waiter/history"
+        element={
+          <ProtectedRoute allowedRoles={["waiter"]}>
+            <WaiterOrderHistory/>
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/payment"
         element={

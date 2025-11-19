@@ -2,7 +2,7 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CheckCircle, IndianRupee, ArrowLeft } from "lucide-react";
-
+import Navbar from "./Navbar"
 export default function OrderSuccess() {
   const { state } = useLocation();
   const navigate = useNavigate();
@@ -18,6 +18,8 @@ export default function OrderSuccess() {
   } = state || {};
 
   return (
+    <>
+    <Navbar/>
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 flex items-center justify-center p-6">
       <div className="bg-white rounded-3xl shadow-2xl overflow-hidden max-w-md w-full transform transition-all hover:scale-[1.02]">
         {/* SUCCESS HEADER */}
@@ -79,5 +81,6 @@ export default function OrderSuccess() {
         </div>
       </div>
     </div>
+    </>
   );
 }
