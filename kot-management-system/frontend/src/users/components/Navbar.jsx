@@ -3,8 +3,9 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  User, LogOut, Settings, ChevronDown, ShoppingCart,
-  Coffee, Pizza, Home, Table
+  User, LogOut, ChevronDown, ShoppingCart,
+  Coffee, Pizza, Home, Table,
+  HistoryIcon
 } from "lucide-react";
 
 const Navbar = ({ user, cartCount, onShowCart, tableNumber, onShowTable }) => {
@@ -19,7 +20,7 @@ const Navbar = ({ user, cartCount, onShowCart, tableNumber, onShowTable }) => {
 
   const userMenuItems = [
     { label: "Profile", icon: User, action: () => navigate("/profile") },
-    { label: "Settings", icon: Settings, action: () => navigate("/settings") },
+    { label: "Order History", icon: HistoryIcon, action: () => navigate("/waiter/history") },
     { label: "Logout", icon: LogOut, action: handleLogout },
   ];
 

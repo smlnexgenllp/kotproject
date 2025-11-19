@@ -2,13 +2,14 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CheckCircle, IndianRupee, ArrowLeft } from "lucide-react";
-
+import Navbar from "./Navbar"
 export default function OrderSuccess() {
   const { state } = useLocation();
   const navigate = useNavigate();
 
   // SAFE DEFAULT VALUES — NO MORE "undefined" ERRORS!
   const {
+     orderId = "N/A",
     tableNumber = "N/A",
     total = 0,
     mode = "Unknown",
@@ -17,6 +18,8 @@ export default function OrderSuccess() {
   } = state || {};
 
   return (
+    <>
+    <Navbar/>
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 flex items-center justify-center p-6">
       <div className="bg-white rounded-3xl shadow-2xl overflow-hidden max-w-md w-full transform transition-all hover:scale-[1.02]">
         {/* SUCCESS HEADER */}
@@ -24,6 +27,9 @@ export default function OrderSuccess() {
           <CheckCircle size={64} className="mx-auto mb-4 animate-bounce" />
           <h1 className="text-4xl font-bold">Order Placed Successfully!</h1>
           <p className="text-xl mt-2 opacity-90">Table {tableNumber}</p>
+          <div className="flex justify-between text-lg">
+  <span className="font-semibold text-gray-700">Order ID:{orderId}</span>
+</div>
         </div>
 
         {/* DETAILS */}
@@ -75,5 +81,6 @@ export default function OrderSuccess() {
         </div>
       </div>
     </div>
+    </>
   );
 }
