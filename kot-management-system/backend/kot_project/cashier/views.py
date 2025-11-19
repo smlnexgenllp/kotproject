@@ -1,4 +1,5 @@
-# cashier/views.py
+# backend/kot_project/cashier/views.py
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -11,6 +12,7 @@ from .models import Order, OrderItem
 from .serializers import OrderSerializer
 from management.models import AdminUser
 
+
 class CashierOrderViewSet(viewsets.ModelViewSet):
     """
     API for Cashier:
@@ -19,6 +21,7 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
     - Mark order as paid
     - Cancel order
     - Get today's collection summary
+    - Refund order (partial or full)
     """
     queryset = Order.objects.prefetch_related('items').order_by('-created_at')
     serializer_class = OrderSerializer
@@ -31,7 +34,7 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
     def create_order(self, request):
         data = request.data
         try:
-        # Validate required fields
+            # Validate required fields
             required = ['tableNumber', 'total', 'cart']
             missing = [field for field in required if field not in data]
             if missing:
@@ -40,7 +43,7 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-        # Get waiter
+            # Get waiter
             waiter_id = data.get('waiter_id')
             waiter = None
             if waiter_id:
@@ -51,7 +54,7 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
 
             payment_mode = data.get('paymentMode', 'cash').lower()
 
-        # Always create order as PENDING
+            # Always create order as PENDING
             order = Order.objects.create(
                 table_number=int(data['tableNumber']),
                 total_amount=float(data['total']),
@@ -61,7 +64,7 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
                 waiter=waiter
             )
 
-        # Create OrderItems
+            # Create OrderItems
             cart = data.get('cart', [])
             if not isinstance(cart, list):
                 return Response({"detail": "cart must be a list"}, status=400)
@@ -161,7 +164,6 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
             upi=Sum('total_amount', filter=Q(payment_mode='upi')),
         )
 
-        # Convert Decimal/None → float
         result = {
             "total": float(collection['total'] or 0),
             "cash": float(collection['cash'] or 0),
@@ -170,3 +172,57 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
         }
 
         return Response(result, status=status.HTTP_200_OK)
+
+    # ──────────────────────────────
+    # 5. REFUND ORDER (Partial or Full)
+    # ──────────────────────────────
+    @action(detail=True, methods=['post'], url_path='refund')
+    def refund(self, request, pk=None):
+        """
+        POST /api/cashier-orders/{id}/refund/
+        Body: { "amount": 150.00, "reason": "Customer unhappy" }
+        """
+        try:
+            order = self.get_object()
+
+            # Calculate remaining refundable amount
+            remaining = float(order.total_amount) - float(order.refunded_amount or 0)
+            amount = float(request.data.get('amount', 0))
+
+            if order.is_refunded and remaining <= 0:
+                return Response(
+                    {"error": "This order is already fully refunded"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if amount <= 0:
+                return Response(
+                    {"error": "Refund amount must be greater than 0"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if amount > remaining:
+                return Response(
+                    {"error": f"Cannot refund ₹{amount}. Max refundable: ₹{remaining}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Process refund
+            order.refunded_amount = float(order.refunded_amount or 0) + amount
+            order.refund_reason = request.data.get('reason', 'No reason provided')
+            order.refunded_at = timezone.now()
+            order.save()
+
+            return Response({
+                "message": "Refund processed successfully",
+                "refunded_amount": float(order.refunded_amount),
+                "remaining_amount": float(order.total_amount) - float(order.refunded_amount),
+                "is_fully_refunded": order.refunded_amount >= order.total_amount
+            }, status=status.HTTP_200_OK)
+
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+        except (ValueError, TypeError) as e:
+            return Response({"error": f"Invalid amount: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
