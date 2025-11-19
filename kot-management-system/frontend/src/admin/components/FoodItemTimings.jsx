@@ -6,7 +6,6 @@ const FoodItemTimings = ({ onMessage }) => {
   const [foodItems, setFoodItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedFood, setSelectedFood] = useState(null);
-  const [customTimings, setCustomTimings] = useState([]);
 
   useEffect(() => {
     fetchFoodItems();
@@ -17,22 +16,6 @@ const FoodItemTimings = ({ onMessage }) => {
       setLoading(true);
       const response = await API.get('food-menu/');
       setFoodItems(response.data);
-      
-      // Extract custom timings from food items
-      const timings = response.data
-        .filter(item => item.is_timing_active && item.start_time && item.end_time)
-        .map(item => ({
-          id: item.food_id,
-          food_id: item.food_id,
-          food_name: item.food_name,
-          subcategory: item.subcategory,
-          custom_timing: [{
-            period: getPeriodFromSubcategory(item.subcategory),
-            time: `${item.start_time}-${item.end_time}`
-          }]
-        }));
-      
-      setCustomTimings(timings);
     } catch (error) {
       console.error('Failed to fetch food items:', error);
       onMessage('Failed to load food items', 'error');
@@ -47,7 +30,6 @@ const FoodItemTimings = ({ onMessage }) => {
 
   const handleSaveCustomTiming = async (timingData) => {
     try {
-      // API call to update timing
       await API.post(`food-menu/${timingData.food_id}/update_timing/`, {
         start_time: timingData.start_time,
         end_time: timingData.end_time,
@@ -56,7 +38,7 @@ const FoodItemTimings = ({ onMessage }) => {
       
       onMessage('Custom timing saved successfully!', 'success');
       setSelectedFood(null);
-      fetchFoodItems(); // Refresh the list
+      fetchFoodItems();
     } catch (error) {
       console.error('Failed to save custom timing:', error);
       onMessage('Failed to save custom timing', 'error');
@@ -72,11 +54,46 @@ const FoodItemTimings = ({ onMessage }) => {
       });
       
       onMessage('Timing removed successfully!', 'success');
-      fetchFoodItems(); // Refresh the list
+      fetchFoodItems();
     } catch (error) {
       console.error('Failed to delete timing:', error);
       onMessage('Failed to delete timing', 'error');
     }
+  };
+
+  // FIX: Proper image URL extraction
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return null;
+    
+    // If it's already a full URL, return it
+    if (imagePath.startsWith('http')) {
+      return imagePath;
+    }
+    
+    // Fix malformed Cloudinary URLs like "image/upload/https://res.cloudinary.com/..."
+    if (imagePath.includes('res.cloudinary.com')) {
+      if (imagePath.includes('/https://')) {
+        // Extract the actual URL from malformed path
+        const urlParts = imagePath.split('/https://');
+        return `https://${urlParts[urlParts.length - 1]}`;
+      }
+      // If it's just the path without domain, construct full URL
+      else if (!imagePath.startsWith('http')) {
+        return `https://res.cloudinary.com/${imagePath}`;
+      }
+    }
+    
+    return imagePath;
+  };
+
+  // FIX: Check if food item can have timing (always show button for active items)
+  const canHaveTiming = (foodItem) => {
+    return foodItem.is_active;
+  };
+
+  // FIX: Check if food item has custom timing
+  const hasCustomTiming = (foodItem) => {
+    return foodItem.is_timing_active && foodItem.start_time && foodItem.end_time;
   };
 
   // Helper function to get period name from subcategory
@@ -112,39 +129,44 @@ const FoodItemTimings = ({ onMessage }) => {
         <table className="min-w-full divide-y divide-gray-300">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5">
                 Food Item
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                 Subcategory
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                 Default Timing
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                 Custom Timing
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                 Availability
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                 Actions
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {foodItems.slice(0, 10).map((food) => {
-              const hasCustomTiming = food.is_timing_active && food.start_time && food.end_time;
+              const customTiming = hasCustomTiming(food);
+              const canSetTiming = canHaveTiming(food);
+              const imageUrl = getImageUrl(food.image || food.image_url);
               
               return (
                 <tr key={food.food_id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      {food.image && (
+                      {imageUrl && (
                         <img
-                          src={food.image}
+                          src={imageUrl}
                           alt={food.food_name}
-                          className="h-8 w-8 rounded-full object-cover mr-3"
+                          className="h-10 w-10 rounded-full object-cover mr-3"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
                         />
                       )}
                       <div>
@@ -153,18 +175,18 @@ const FoodItemTimings = ({ onMessage }) => {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">
-                    {food.subcategory}
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">
+                    {food.subcategory || 'No category'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                     {getDefaultTiming(food.subcategory)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {hasCustomTiming ? (
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {customTiming ? (
                       <div className="space-y-1">
                         <div className="bg-blue-50 px-2 py-1 rounded text-xs">
                           <span className="font-medium">
-                            {getPeriodFromSubcategory(food.subcategory)}:
+                            Custom: 
                           </span> {food.start_time} - {food.end_time}
                         </div>
                       </div>
@@ -172,7 +194,7 @@ const FoodItemTimings = ({ onMessage }) => {
                       <span className="text-gray-400">No custom timing</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       food.is_available_now ? 
                       'bg-green-100 text-green-800' : 
@@ -181,21 +203,27 @@ const FoodItemTimings = ({ onMessage }) => {
                       {food.is_available_now ? 'Available' : 'Not Available'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                    <button
-                      onClick={() => handleAddCustomTiming(food)}
-                      className="text-indigo-600 hover:text-indigo-900"
-                    >
-                      {hasCustomTiming ? 'Edit' : 'Add'} Timing
-                    </button>
-                    {hasCustomTiming && (
-                      <button
-                        onClick={() => handleDeleteTiming(food.food_id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Remove
-                      </button>
-                    )}
+                  <td className="px-4 py-4">
+                    <div className="flex flex-col space-y-2 min-w-[120px]">
+                      {canSetTiming && (
+                        <>
+                          <button
+                            onClick={() => handleAddCustomTiming(food)}
+                            className="text-indigo-600 hover:text-indigo-900 px-3 py-1.5 rounded border border-indigo-600 hover:bg-indigo-50 text-xs font-medium transition-colors duration-200 whitespace-nowrap w-full text-center"
+                          >
+                            {customTiming ? 'Edit Timing' : 'Add Timing'}
+                          </button>
+                          {customTiming && (
+                            <button
+                              onClick={() => handleDeleteTiming(food.food_id)}
+                              className="text-red-600 hover:text-red-900 px-3 py-1.5 rounded border border-red-600 hover:bg-red-50 text-xs font-medium transition-colors duration-200 whitespace-nowrap w-full text-center"
+                            >
+                              Remove Timing
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

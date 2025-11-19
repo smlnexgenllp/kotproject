@@ -1,6 +1,6 @@
 # backend/management/serializers.py
 from rest_framework import serializers
-from .models import FoodItem,RestaurantTable,SubCategory
+from .models import FoodItem,RestaurantTable,SubCategory,TableSeat
 
 class SubCategorySerializer(serializers.ModelSerializer):
     timing_display = serializers.ReadOnlyField()
@@ -39,25 +39,33 @@ class FoodItemSerializer(serializers.ModelSerializer):
             'timing_display', 'has_timing', 'is_available_now', 'availability_status'
         ]
         
+class TableSeatSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TableSeat
+        fields = ['seat_id', 'seat_number', 'row_number', 'seat_label', 'is_available']
+
 class RestaurantTableSerializer(serializers.ModelSerializer):
+    seats = TableSeatSerializer(many=True, read_only=True)
+    available_seats = serializers.ReadOnlyField()
+    seat_arrangement = serializers.ReadOnlyField()
+    
     class Meta:
         model = RestaurantTable
         fields = [
-            'table_id',
-            'table_number',
-            'is_active',
-            'created_at',
-            'updated_at'
+            'table_id', 
+            'table_number', 
+            'total_seats', 
+            'seats_per_row', 
+            'is_active', 
+            'seats',
+            'available_seats',
+            'seat_arrangement',
+            'created_at'
         ]
-        read_only_fields = ['table_id', 'created_at', 'updated_at']
+        read_only_fields = ['table_id', 'created_at']
 
-    def validate_table_number(self, value):
-        """Ensure table number is unique"""
-        if RestaurantTable.objects.filter(table_number=value).exists():
-            if self.instance and self.instance.table_number == value:
-                return value
-            raise serializers.ValidationError("Table number already exists")
-        return value
+    def get_available_seats(self, obj):
+        return obj.get_available_seats()
 
-
-              
+    def get_seat_arrangement(self, obj):
+        return obj.get_seat_arrangement()
