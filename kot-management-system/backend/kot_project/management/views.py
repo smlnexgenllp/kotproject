@@ -5,7 +5,7 @@ from datetime import timedelta
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from management.models import AdminUser, EmailOTP,FoodItem,RestaurantTable,SubCategory
+from management.models import AdminUser, EmailOTP,FoodItem,RestaurantTable,SubCategory,TableSeat
 from django.contrib.auth.hashers import make_password
 import logging
 from django.contrib.auth import authenticate
@@ -13,7 +13,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
-from .serializers import FoodItemSerializer,RestaurantTableSerializer,SubCategorySerializer
+from .serializers import FoodItemSerializer,RestaurantTableSerializer,SubCategorySerializer,TableSeatSerializer
 from cashier.models import Order, OrderItem
 from django.db.models import Q
 from django.http import HttpResponse
@@ -477,11 +477,12 @@ class SubCategoryViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+
 class RestaurantTableViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for managing restaurant tables 
+    ViewSet for managing restaurant tables with seats
     """
-    queryset = RestaurantTable.objects.filter(is_active=True).order_by('table_number')
+    queryset = RestaurantTable.objects.filter(is_active=True).prefetch_related('seats')
     serializer_class = RestaurantTableSerializer
     permission_classes = [permissions.AllowAny]
 
@@ -489,6 +490,7 @@ class RestaurantTableViewSet(viewsets.ModelViewSet):
         """Soft delete implementation"""
         instance.is_active = False
         instance.save()
+
     @action(detail=False, methods=['get'], url_path='active-numbers')
     def active_numbers(self, request):
         """
@@ -497,6 +499,64 @@ class RestaurantTableViewSet(viewsets.ModelViewSet):
         """
         tables = self.get_queryset().values('table_id', 'table_number')
         return Response(list(tables))
+
+    @action(detail=True, methods=['get'], url_path='seats')
+    def table_seats(self, request, pk=None):
+        """Get all seats for a specific table"""
+        table = self.get_object()
+        seats = table.seats.all()
+        serializer = TableSeatSerializer(seats, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='update-availability')
+    def update_seat_availability(self, request, pk=None):
+        """Update seat availability in bulk"""
+        table = self.get_object()
+        seat_updates = request.data.get('seat_updates', [])
+        
+        updated_seats = []
+        for update in seat_updates:
+            try:
+                seat = table.seats.get(seat_number=update['seat_number'])
+                seat.is_available = update['is_available']
+                seat.save()
+                updated_seats.append(seat.seat_number)
+            except TableSeat.DoesNotExist:
+                continue
+        
+        return Response({
+            'message': f'Updated {len(updated_seats)} seats',
+            'updated_seats': updated_seats
+        })
+
+
+class TableSeatViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing individual table seats
+    """
+    queryset = TableSeat.objects.all()
+    serializer_class = TableSeatSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        queryset = TableSeat.objects.all()
+        table_id = self.request.query_params.get('table_id')
+        if table_id:
+            queryset = queryset.filter(table_id=table_id)
+        return queryset
+
+    @action(detail=True, methods=['post'], url_path='toggle-availability')
+    def toggle_availability(self, request, pk=None):
+        """Toggle seat availability"""
+        seat = self.get_object()
+        seat.is_available = not seat.is_available
+        seat.save()
+        
+        return Response({
+            'seat_number': seat.seat_number,
+            'is_available': seat.is_available,
+            'message': f'Seat {seat.seat_number} is now {"available" if seat.is_available else "occupied"}'
+        })
 
 class OrderHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.AllowAny]

@@ -131,11 +131,37 @@ class FoodItem(models.Model):
         if self.is_available_now():
             return "Available Now"
         else:
-            return f"Available from {self.start_time} to {self.end_time}"   
+            return f"Available from {self.start_time} to {self.end_time}" 
+    @property
+    def image_url(self):
+        """Get proper image URL for CloudinaryField"""
+        if not self.image:
+            return None
+        
+        # If it's already a proper URL, return it
+        if hasattr(self.image, 'url'):
+            return self.image.url
+        
+        # Handle string paths that might contain full URLs
+        if isinstance(self.image, str):
+            if 'res.cloudinary.com' in self.image:
+                # Extract the actual Cloudinary URL from malformed paths
+                if '/https://' in self.image:
+                    parts = self.image.split('/https://')
+                    if len(parts) > 1:
+                        return f"https://{parts[-1]}"
+                return self.image
+            else:
+                # It's a regular Cloudinary path
+                return self.image
+        
+        return str(self.image)          
 
 class RestaurantTable(models.Model):
     table_id = models.AutoField(primary_key=True)
     table_number = models.CharField(max_length=10, unique=True)
+    total_seats = models.PositiveIntegerField(default=4)
+    seats_per_row = models.PositiveIntegerField(default=2)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -145,7 +171,76 @@ class RestaurantTable(models.Model):
         ordering = ['table_number']
 
     def __str__(self):
-        return f"Table {self.table_number}"        
+        return f"Table {self.table_number} ({self.total_seats} seats)"
+
+    def save(self, *args, **kwargs):
+        """Override save to auto-generate seats when table is created/updated"""
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        
+        if is_new or 'total_seats' in kwargs.get('update_fields', []) or 'seats_per_row' in kwargs.get('update_fields', []):
+            self.generate_seats()
+
+    def generate_seats(self):
+        """Generate seat records based on total_seats and seats_per_row"""
+        # Delete existing seats first
+        self.seats.all().delete()
+        
+        rows_needed = (self.total_seats + self.seats_per_row - 1) // self.seats_per_row
+        seat_labels = ['A', 'B', 'C', 'D', 'E', 'F']
+        
+        seat_count = 0
+        for row in range(1, rows_needed + 1):
+            for seat_idx in range(self.seats_per_row):
+                if seat_count < self.total_seats:
+                    seat_label = seat_labels[seat_idx]
+                    seat_number = f"{self.table_number}{row}{seat_label}"
+                    
+                    TableSeat.objects.create(
+                        table=self,
+                        seat_number=seat_number,
+                        row_number=row,
+                        seat_label=seat_label,
+                        is_available=True
+                    )
+                    seat_count += 1
+
+    def get_available_seats(self):
+        """Return available seats count"""
+        return self.seats.filter(is_available=True).count()
+
+    def get_seat_arrangement(self):
+        """Return organized seat arrangement by rows"""
+        seats = self.seats.all().order_by('row_number', 'seat_label')
+        arrangement = {}
+        for seat in seats:
+            if seat.row_number not in arrangement:
+                arrangement[seat.row_number] = []
+            arrangement[seat.row_number].append({
+                'seat_number': seat.seat_number,
+                'seat_label': seat.seat_label,
+                'is_available': seat.is_available
+            })
+        return arrangement
+
+
+class TableSeat(models.Model):
+    seat_id = models.AutoField(primary_key=True)
+    table = models.ForeignKey(RestaurantTable, on_delete=models.CASCADE, related_name='seats')
+    seat_number = models.CharField(max_length=10)  # 11A, 11B, 12A, etc.
+    row_number = models.PositiveIntegerField()  # 1, 2, 3
+    seat_label = models.CharField(max_length=5)  # A, B, C
+    is_available = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'table_seats'
+        unique_together = ['table', 'seat_number']
+        ordering = ['row_number', 'seat_label']
+
+    def __str__(self):
+        return f"Seat {self.seat_number} (Table {self.table.table_number})"      
 
 class SubCategory(models.Model):
     subcategory_id = models.AutoField(primary_key=True)
