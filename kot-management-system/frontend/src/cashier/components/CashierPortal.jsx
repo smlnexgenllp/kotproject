@@ -79,7 +79,7 @@ const Sidebar = ({ active, setActive, onLogout }) => {
       className="w-72 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 shadow-xl z-50"
     >
       <div className="p-6 border-b border-gray-200">
-        <h1 className="text-3xl font-extrabold text-blue-900 tracking-tight">
+        <h1 className="text-3xl font-extrabold text-blue-900 t racking-tight">
           KOT<span className="text-blue-600">Pro</span>
         </h1>
         <p className="text-gray-600 text-sm mt-1">Cashier Portal</p>
@@ -259,7 +259,7 @@ const OrderHistory = ({ orders = [] }) => {
                   <PaymentIcon mode={order.payment_mode} />
                   <div>
                     <p className="font-semibold text-gray-800">
-                      Table {order.table_number}
+                      Table {order.table_number}: {order.selected_seats}
                       <span className="text-gray-600 ml-2">
                         #{order.order_id}
                       </span>
@@ -387,41 +387,82 @@ const CashierDashboard = () => {
   const navigate = useNavigate();
 
   const fetchData = async () => {
-    try {
-      setError("");
-      const res = await API.get(API_URL);
-      const allOrders = res.data;
+  try {
+    setError("");
+    const res = await API.get(API_URL);
+    const allOrders = res.data;
 
-      // Filter orders
-      const pending = allOrders.filter((o) => o.status === "pending");
-      const completed = allOrders.filter(
-        (o) => o.status === "paid" && o.paid_at
-      );
+    // Filter pending orders
+    const pending = allOrders.filter((o) => o.status === "pending");
 
-      // Calculate today's collection
-      const today = new Date().toISOString().split("T")[0];
-      const todayPaid = completed.filter((o) => o.paid_at?.startsWith(today));
+    // Get all settled (non-pending) orders
+    const settled = allOrders
+      .filter((o) => o.status !== "pending")
+      .map((order) => {
+        let items = [];
+        if (typeof order.items === "string") {
+          try { items = JSON.parse(order.items); } catch (e) { items = []; }
+        } else if (Array.isArray(order.items)) {
+          items = order.items;
+        } else if (order.items && typeof order.items === "object") {
+          items = Object.values(order.items);
+        }
 
-      const collection = todayPaid.reduce(
-        (acc, o) => {
-          const amount = parseFloat(o.total_amount) || 0;
-          acc.total += amount;
-          if (o.payment_mode in acc) acc[o.payment_mode] += amount;
-          return acc;
-        },
-        { total: 0, cash: 0, card: 0, upi: 0 }
-      );
+        return {
+          ...order,
+          items,
+          refunded_amount: parseFloat(order.refunded_amount || 0),
+          total_amount: parseFloat(order.total_amount || 0),
+        };
+      });
 
-      setPendingOrders(pending);
-      setCompletedOrders(todayPaid);
-      setTodayCollection(collection);
-    } catch (err) {
-      setError("Failed to load dashboard data");
-      console.error("Dashboard fetch error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Today's date filter
+    const today = new Date().toISOString().split("T")[0];
+    const todaySettled = settled.filter((o) => {
+      const date = (o.paid_at || o.updated_at || o.created_at)?.split("T")[0];
+      return date === today;
+    });
+
+    // Calculate NET collection (after refunds & excluding canceled)
+    const collection = todaySettled.reduce((acc, order) => {
+      // Skip fully canceled orders
+      if (order.status === "canceled" || order.status === "cancelled") {
+        return acc;
+      }
+
+      // Net amount = total - refunded
+      const netAmount = order.total_amount - order.refunded_amount;
+
+      // Only include if net amount > 0
+      if (netAmount <= 0) return acc;
+
+      acc.total += netAmount;
+
+      const mode = (order.payment_mode || "cash").toLowerCase();
+      if (["cash", "card", "upi"].includes(mode)) {
+        acc[mode] += netAmount;
+      } else {
+        acc.cash += netAmount; // fallback
+      }
+
+      return acc;
+    }, { total: 0, cash: 0, card: 0, upi: 0 });
+
+    // Update state
+    setPendingOrders(pending);
+    setCompletedOrders(todaySettled.filter(o => 
+      (o.status === "paid" || o.refunded_amount > 0) && 
+      (o.total_amount - o.refunded_amount > 0)
+    ));
+    setTodayCollection(collection);
+
+  } catch (err) {
+    setError("Failed to load dashboard data");
+    console.error("Dashboard fetch error:", err);
+  } finally {
+    setLoading(false);
+  }
+}; 
 
   useEffect(() => {
     fetchData();

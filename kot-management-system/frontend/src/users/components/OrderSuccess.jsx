@@ -10,6 +10,7 @@ export default function OrderSuccess() {
   const {
      orderId = "N/A",
     tableNumber = "N/A",
+    selected_seats="N/A",
     total = 0,
     mode = "Unknown",
     received = total, 
@@ -27,7 +28,7 @@ export default function OrderSuccess() {
           <h1 className="text-4xl font-bold">Order Placed Successfully!</h1>
           <p className="text-xl mt-2 opacity-90">Table {tableNumber}</p>
           <div className="flex justify-between text-lg">
-  <span className="font-semibold text-gray-700">Order ID:{orderId}</span>
+  <span className="font-semibold ml-24 pl-14 text-gray-700">Order ID:{orderId}</span>
 </div>
         </div>
 
