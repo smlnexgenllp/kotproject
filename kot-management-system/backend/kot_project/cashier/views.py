@@ -30,12 +30,14 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
     # ──────────────────────────────
     # 1. CREATE ORDER (Waiter → Cashier)
     # ──────────────────────────────
+    # cashier/views.py - Update the create_order method
+    # cashier/views.py
     @action(detail=False, methods=['post'], url_path='create_order')
     def create_order(self, request):
         data = request.data
         try:
             # Validate required fields
-            required = ['tableNumber', 'total', 'cart']
+            required = ['table_number', 'total_amount', 'cart']  # Updated field names
             missing = [field for field in required if field not in data]
             if missing:
                 return Response(
@@ -44,7 +46,7 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
                 )
 
             # Get waiter
-            waiter_id = data.get('waiter_id')
+            waiter_id = data.get('waiter')
             waiter = None
             if waiter_id:
                 try:
@@ -52,19 +54,25 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
                 except AdminUser.DoesNotExist:
                     return Response({"detail": "Invalid waiter_id"}, status=400)
 
-            payment_mode = data.get('paymentMode', 'cash').lower()
+            payment_mode = data.get('payment_mode', 'cash').lower()
 
-            # Always create order as PENDING
+            # Get seat information
+            selected_seats = data.get('selected_seats', [])
+            table_id = data.get('table_id')
+
+            # Create order
             order = Order.objects.create(
-                table_number=int(data['tableNumber']),
-                total_amount=float(data['total']),
+                table_number=int(data['table_number']),
+                table_id=table_id,
+                selected_seats=selected_seats,
+                total_amount=float(data['total_amount']),
                 payment_mode=payment_mode,
                 received_amount=float(data.get('received_amount', 0)),
                 status='pending',
                 waiter=waiter
             )
 
-            # Create OrderItems
+            # Create OrderItems - FIXED: Include food_id
             cart = data.get('cart', [])
             if not isinstance(cart, list):
                 return Response({"detail": "cart must be a list"}, status=400)
@@ -73,16 +81,26 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
             for item in cart:
                 if not all(k in item for k in ['name', 'quantity', 'price']):
                     return Response({"detail": "Invalid item in cart"}, status=400)
+                
                 order_items.append(
                     OrderItem(
                         order=order,
-                        food_id=item.get('food_id'),
+                        food_id=item.get('food_id'),  # Make sure this is included
                         name=str(item['name']),
                         quantity=int(item['quantity']),
                         price=float(item['price'])
                     )
                 )
+            
             OrderItem.objects.bulk_create(order_items)
+
+            # Mark selected seats as occupied
+            if selected_seats:
+                from management.models import TableSeat
+                TableSeat.objects.filter(
+                    seat_number__in=selected_seats,
+                    table__table_number=data['table_number']
+                ).update(is_available=False)
 
             serializer = OrderSerializer(order)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
