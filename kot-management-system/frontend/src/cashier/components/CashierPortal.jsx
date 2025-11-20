@@ -69,7 +69,6 @@ const Sidebar = ({ active, setActive, onLogout }) => {
       icon: CheckCircle,
       path: "/cashier/completed-orders",
     },
-    { id: "waiter", label: "Waiter Menu", icon: Users, path: "/menu" },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 

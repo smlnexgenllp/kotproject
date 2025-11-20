@@ -1,13 +1,11 @@
 # backend/kot_project/cashier/views.py
-
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny  # Change to IsAuthenticated in production
+from rest_framework.permissions import AllowAny 
 from django.utils import timezone
 from django.db.models import Sum, Q
 from datetime import date
-
 from .models import Order, OrderItem
 from .serializers import OrderSerializer
 from management.models import AdminUser
@@ -178,10 +176,6 @@ class CashierOrderViewSet(viewsets.ModelViewSet):
     # ──────────────────────────────
     @action(detail=True, methods=['post'], url_path='refund')
     def refund(self, request, pk=None):
-        """
-        POST /api/cashier-orders/{id}/refund/
-        Body: { "amount": 150.00, "reason": "Customer unhappy" }
-        """
         try:
             order = self.get_object()
 

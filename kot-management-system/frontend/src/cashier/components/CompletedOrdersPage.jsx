@@ -1,22 +1,21 @@
+// src/pages/CompletedOrdersPage.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Coffee, Package, IndianRupee } from "lucide-react";
 import {
   ArrowLeft,
-  IndianRupee,
   CheckCircle,
+  XCircle,
+  AlertCircle,
   CreditCard,
   DollarSign,
   Smartphone,
-  Filter,
-  Coffee,
-  Package,
-  ChevronDown,
-  ChevronUp,
   User,
-  AlertCircle,
   Undo2,
   X,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import API from "../../api";
 import Sidebar from "./Sidebar";
@@ -29,28 +28,66 @@ const PaymentIcon = ({ mode }) => {
     card: <CreditCard size={16} className="text-indigo-600" />,
     upi: <Smartphone size={16} className="text-purple-600" />,
   };
-  return icons[mode] || null;
+  return icons[mode?.toLowerCase()] || null;
+};
+
+const StatusBadge = ({ status, refundedAmount = 0, totalAmount = 0 }) => {
+  const isFullyRefunded = refundedAmount >= totalAmount;
+  const isPartiallyRefunded = refundedAmount > 0 && refundedAmount < totalAmount;
+
+  if (status === "canceled" || status === "cancelled") {
+    return (
+      <span className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-xs font-bold flex items-center gap-1">
+        <XCircle size={14} />
+        Canceled
+      </span>
+    );
+  }
+
+  if (isFullyRefunded) {
+    return (
+      <span className="px-3 py-1.5 bg-red-100 text-red-700 rounded-full text-xs font-bold flex items-center gap-1">
+        <AlertCircle size={14} />
+        Fully Refunded
+      </span>
+    );
+  }
+
+  if (isPartiallyRefunded) {
+    return (
+      <span className="px-3 py-1.5 bg-orange-100 text-orange-700 rounded-full text-xs font-bold flex items-center gap-1">
+        <AlertCircle size={14} />
+        Partially Refunded
+      </span>
+    );
+  }
+
+  return (
+    <span className="px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-xs font-bold flex items-center gap-1">
+      <CheckCircle size={14} />
+      Paid
+    </span>
+  );
 };
 
 const CompletedOrdersPage = () => {
-  const [completedOrders, setCompletedOrders] = useState([]);
+  const [allSettledOrders, setAllSettledOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState("today");
-  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [expanded, setExpanded] = useState({});
-  const [refundModal, setRefundModal] = useState(null); // { order, amount, reason }
+  const [refundModal, setRefundModal] = useState(null);
 
   const navigate = useNavigate();
 
-  // FETCH ORDERS
-  const fetchCompletedOrders = async () => {
+  const fetchOrders = async () => {
     try {
       const res = await API.get(API_URL);
-      const allOrders = res.data;
+      const orders = res.data;
 
-      const completed = allOrders
-        .filter((o) => o.status === "paid" && o.paid_at)
+      const settled = orders
+        .filter((o) => o.status !== "pending")
         .map((order) => {
           let items = [];
           if (typeof order.items === "string") {
@@ -60,11 +97,18 @@ const CompletedOrdersPage = () => {
           } else if (order.items && typeof order.items === "object") {
             items = Object.values(order.items);
           }
-          return { ...order, items };
-        });
 
-      setCompletedOrders(completed);
-      applyFilters(completed, dateFilter, paymentFilter);
+          return {
+            ...order,
+            items,
+            refunded_amount: parseFloat(order.refunded_amount || 0),
+            total_amount: parseFloat(order.total_amount || 0),
+          };
+        })
+        .sort((a, b) => new Date(b.updated_at || b.paid_at || b.created_at) - new Date(a.updated_at || a.paid_at || a.created_at));
+
+      setAllSettledOrders(settled);
+      applyFilters(settled, dateFilter, statusFilter);
     } catch (err) {
       console.error("Failed to load orders", err);
     } finally {
@@ -72,80 +116,132 @@ const CompletedOrdersPage = () => {
     }
   };
 
-  // FILTERS
-  const applyFilters = (orders, dateF, payF) => {
+  const applyFilters = (orders, dateF, statusF) => {
     let filtered = [...orders];
+
     const today = new Date().toISOString().split("T")[0];
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yStr = yesterday.toISOString().split("T")[0];
+
     if (dateF === "today") {
-      filtered = filtered.filter((o) => o.paid_at?.startsWith(today));
+      filtered = filtered.filter((o) => {
+        const date = (o.paid_at || o.updated_at || o.created_at)?.split("T")[0];
+        return date === today;
+      });
     } else if (dateF === "yesterday") {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yStr = yesterday.toISOString().split("T")[0];
-      filtered = filtered.filter((o) => o.paid_at?.startsWith(yStr));
+      filtered = filtered.filter((o) => {
+        const date = (o.paid_at || o.updated_at || o.created_at)?.split("T")[0];
+        return date === yStr;
+      });
     }
 
-    if (payF !== "all") {
-      filtered = filtered.filter((o) => o.payment_mode === payF);
+    if (statusF !== "all") {
+      if (statusF === "canceled") {
+        filtered = filtered.filter((o) => ["canceled", "cancelled"].includes(o.status));
+      } else if (statusF === "refunded") {
+        filtered = filtered.filter((o) => o.refunded_amount > 0);
+      } else {
+        filtered = filtered.filter((o) => o.status === statusF);
+      }
     }
 
-    filtered.sort((a, b) => new Date(b.paid_at) - new Date(a.paid_at));
     setFilteredOrders(filtered);
   };
 
   useEffect(() => {
-    fetchCompletedOrders();
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    applyFilters(completedOrders, dateFilter, paymentFilter);
-  }, [dateFilter, paymentFilter, completedOrders]);
+    applyFilters(allSettledOrders, dateFilter, statusFilter);
+  }, [dateFilter, statusFilter, allSettledOrders]);
 
-  // REFUND LOGIC
+  // ACCURATE COLLECTION BREAKDOWN
+ // ACCURATE COLLECTION BREAKDOWN - FIXED VERSION
+// ACCURATE COLLECTION BREAKDOWN — FIXED FOR ORDER-LEVEL REFUNDS
+const { foodCollection, cafeCollection, totalCollection } = filteredOrders.reduce(
+  (acc, order) => {
+    // 1. Skip fully canceled orders
+    if (order.status === "canceled" || order.status === "cancelled") {
+      return acc;
+    }
+
+    // 2. Net amount after total refund
+    const netOrderAmount = order.total_amount - order.refunded_amount;
+    if (netOrderAmount <= 0) return acc;
+
+    // 3. Distribute the net amount proportionally between Food & Cafe
+    let foodSubtotal = 0;
+    let cafeSubtotal = 0;
+
+    order.items.forEach((item) => {
+      const itemTotal = item.price * item.quantity;
+      if (
+        item.category === "cafe" ||
+        item.category === "beverage" ||
+        item.category === "drinks"
+      ) {
+        cafeSubtotal += itemTotal;
+      } else {
+        foodSubtotal += itemTotal;
+      }
+    });
+
+    const grandTotal = foodSubtotal + cafeSubtotal;
+    if (grandTotal === 0) return acc;
+
+    // Pro-rate the net amount based on original subtotal ratios
+    const foodRatio = foodSubtotal / grandTotal;
+    const cafeRatio = cafeSubtotal / grandTotal;
+
+    acc.foodCollection += netOrderAmount * foodRatio;
+    acc.cafeCollection += netOrderAmount * cafeRatio;
+    acc.totalCollection += netOrderAmount;
+
+    return acc;
+  },
+  { foodCollection: 0, cafeCollection: 0, totalCollection: 0 }
+);
+
+  const toggleExpand = (id) => {
+    setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const openRefundModal = (order) => {
+    const remaining = order.total_amount - order.refunded_amount;
+    if (remaining <= 0) return;
+
     setRefundModal({
       order,
-      amount: order.total_amount,
+      amount: remaining.toFixed(2),
       reason: "",
     });
   };
 
   const handleRefund = async () => {
-    if (!refundModal?.amount || refundModal.amount <= 0) {
-      alert("Enter valid refund amount");
-      return;
-    }
+    if (!refundModal?.amount || refundModal.amount <= 0) return;
 
     try {
-      await API.refundOrder(
-        refundModal.order.order_id,
-        parseFloat(refundModal.amount),
-        refundModal.reason || "Customer request"
-      );
+      await API.post(`/cashier-orders/${refundModal.order.order_id}/refund/`, {
+        amount: parseFloat(refundModal.amount),
+        reason: refundModal.reason || "Customer request",
+      });
 
       alert(`₹${refundModal.amount} refunded successfully`);
       setRefundModal(null);
-      fetchCompletedOrders(); // Refresh list
+      fetchOrders();
     } catch (err) {
-      console.error(err);
       alert(err.response?.data?.error || "Refund failed");
     }
   };
 
-  const toggleExpand = (orderId) => {
-    setExpanded((prev) => ({ ...prev, [orderId]: !prev[orderId] }));
-  };
-
-  const getTotalAmount = () =>
-  filteredOrders.reduce((sum, o) => {
-    const remaining = parseFloat(o.total_amount) - parseFloat(o.refunded_amount || 0);
-    return sum + remaining;
-  }, 0);
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
-        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity }}>
           <Coffee className="text-blue-700" size={64} />
         </motion.div>
       </div>
@@ -156,143 +252,207 @@ const CompletedOrdersPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex">
       <Sidebar active="completed" onLogout={() => { localStorage.clear(); navigate("/"); }} />
 
-      <main className="flex-1 ml-72 p-6 md:p-10">
+      <main className="flex-1 lg:ml-72 p-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-8">
             <button onClick={() => navigate("/cashier")} className="flex items-center gap-2 text-blue-700 hover:text-blue-900 mb-4">
-              <ArrowLeft size={20} /> Back to Dashboard
+              <ArrowLeft size={20} /> Back
             </button>
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-4xl font-extrabold text-blue-900">Completed Orders</h1>
-                <p className="text-gray-700 mt-2">History of all settled payments</p>
-              </div>
-              <div className="bg-green-100 text-green-800 px-4 py-2 rounded-full font-semibold">
-                {filteredOrders.length} Orders
-              </div>
-            </div>
+            <h1 className="text-4xl font-extrabold text-blue-900">All Settled Orders</h1>
+            <p className="text-gray-600">Paid, Canceled & Refunded Orders</p>
           </div>
 
-          {/* Filters + Summary */}
-          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border border-gray-200">
-            <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center">
-              <div className="flex flex-wrap gap-4">
-                <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2">
-                  <option value="today">Today</option>
-                  <option value="yesterday">Yesterday</option>
-                  <option value="all">All Time</option>
-                </select>
-                <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2">
-                  <option value="all">All Payments</option>
-                  <option value="cash">Cash</option>
-                  <option value="card">Card</option>
-                  <option value="upi">UPI</option>
-                </select>
+          {/* COLLECTION CARDS */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+            {/* Food */}
+            <motion.div
+              whileHover={{ scale: 1.03 }}
+              className="bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-2xl shadow-xl p-6 flex items-center gap-4"
+            >
+              <div className="bg-white/20 p-4 rounded-xl">
+                <Package size={40} />
               </div>
-              <div className="bg-blue-50 px-4 py-3 rounded-xl">
-                <div className="flex items-center gap-2 text-blue-800 font-bold">
-                  <IndianRupee size={20} />
-                  <span className="text-xl">₹{getTotalAmount().toFixed(2)}</span>
-                </div>
-                <p className="text-sm text-blue-600">Total Collection</p>
+              <div>
+                <p className="text-orange-100 text-sm font-medium">Food Collection</p>
+                <p className="text-3xl font-bold">₹{foodCollection.toFixed(2)}</p>
               </div>
+            </motion.div>
+
+            {/* Cafe */}
+            <motion.div
+              whileHover={{ scale: 1.03 }}
+              className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-2xl shadow-xl p-6 flex items-center gap-4"
+            >
+              <div className="bg-white/20 p-4 rounded-xl">
+                <Coffee size={40} />
+              </div>
+              <div>
+                <p className="text-teal-100 text-sm font-medium">Cafe Collection</p>
+                <p className="text-3xl font-bold">₹{cafeCollection.toFixed(2)}</p>
+              </div>
+            </motion.div>
+
+            {/* Total */}
+            <motion.div
+              whileHover={{ scale: 1.03 }}
+              className="bg-gradient-to-r from-green-600 to-emerald-700 text-white rounded-2xl shadow-xl p-6 flex items-center gap-4"
+            >
+              <div className="bg-white/20 p-4 rounded-xl">
+                <IndianRupee size={40} />
+              </div>
+              <div>
+                <p className="text-green-100 text-sm font-medium">Total Net</p>
+                <p className="text-4xl font-bold">₹{totalCollection.toFixed(2)}</p>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Filters */}
+          <div className="bg-white rounded-2xl shadow-lg p-5 mb-6 border">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="px-4 py-3 rounded-xl border border-gray-300 font-medium">
+                <option value="all">All Time</option>
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+              </select>
+
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-4 py-3 rounded-xl border border-gray-300 font-medium">
+                <option value="all">All Status</option>
+                <option value="paid">Paid Only</option>
+                <option value="canceled">Canceled</option>
+                <option value="refunded">Refunded</option>
+              </select>
             </div>
           </div>
 
           {/* Orders Table */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-xl border overflow-hidden">
             {filteredOrders.length === 0 ? (
-              <div className="p-12 text-center">
-                <CheckCircle size={64} className="mx-auto text-gray-400 mb-4" />
-                <h3 className="text-xl font-bold text-gray-600 mb-2">No Completed Orders</h3>
+              <div className="p-16 text-center text-gray-500">
+                <CheckCircle size={64} className="mx-auto mb-4 text-gray-400" />
+                <p className="text-xl font-medium">No settled orders found</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50 border-b">
+                  <thead className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white">
                     <tr>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Order ID</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Table</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Waiter</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Payment</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Amount</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Completed At</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
+                      <th className="px-6 py-4 text-left">Order ID</th>
+                      <th className="px-6 py-4 text-left">Table</th>
+                      <th className="px-6 py-4 text-left">Waiter</th>
+                      <th className="px-6 py-4 text-left">Payment</th>
+                      <th className="px-6 py-4 text-right">Amount</th>
+                      <th className="px-6 py-4 text-center">Status</th>
+                      <th className="px-6 py-4 text-left">Time</th>
+                      <th className="px-6 py-4 text-center">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {filteredOrders.map((order, idx) => {
-                      const isOpen = expanded[order.order_id];
-                      const isRefunded = order.refunded_amount > 0;
-                      const remaining = parseFloat(order.total_amount) - parseFloat(order.refunded_amount || 0);
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredOrders.map((order) => {
+                      const remaining = order.total_amount - order.refunded_amount;
+                      const isCanceled = ["canceled", "cancelled"].includes(order.status);
 
                       return (
                         <React.Fragment key={order.order_id}>
-                          <motion.tr initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: idx * 0.05 }} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 font-mono font-semibold">#{order.order_id}</td>
+                          <tr className="hover:bg-blue-50 transition">
+                            <td className="px-6 py-4 font-bold text-blue-900">#{order.order_id}</td>
                             <td className="px-6 py-4 font-semibold">Table {order.table_number}</td>
                             <td className="px-6 py-4">
-                              <div className="flex items-center gap-1">
-                                <User size={14} className="text-blue-600" />
-                                <span>{order.waiter_name || "—"}</span>
+                              <div className="flex items-center gap-2">
+                                <User size={14} />
+                                {order.waiter_name || "—"}
                               </div>
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-2">
                                 <PaymentIcon mode={order.payment_mode} />
-                                <span className="capitalize">{order.payment_mode}</span>
+                                <span className="capitalize">{order.payment_mode || "—"}</span>
                               </div>
                             </td>
-                            <td className="px-6 py-4">
-                              <div className="font-bold text-green-700">
+                            <td className="px-6 py-4 text-right">
+                              <div className={`font-bold ${isCanceled ? "text-gray-500" : "text-green-700"}`}>
                                 ₹{remaining.toFixed(2)}
-                                {isRefunded && <span className="block text-xs text-red-600">−₹{order.refunded_amount}</span>}
+                                {order.refunded_amount > 0 && (
+                                  <div className="text-xs text-red-600">−₹{order.refunded_amount.toFixed(2)}</div>
+                                )}
+                                {isCanceled && <div className="text-xs text-gray-500">Canceled</div>}
                               </div>
                             </td>
-                            <td className="px-6 py-4">
-                              {isRefunded ? (
-                                <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">Refunded</span>
-                              ) : (
-                                <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">Paid</span>
-                              )}
+                            <td className="px-6 py-4 text-center">
+                              <StatusBadge
+                                status={order.status}
+                                refundedAmount={order.refunded_amount}
+                                totalAmount={order.total_amount}
+                              />
                             </td>
-                            <td className="px-6 py-4 text-gray-600">
-                              {new Date(order.paid_at).toLocaleString()}
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {new Date(order.paid_at || order.updated_at || order.created_at).toLocaleString("en-IN", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                day: "2-digit",
+                                month: "short",
+                              })}
                             </td>
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-2">
+                            <td className="px-6 py-4 text-center">
+                              <div className="flex items-center justify-center gap-2">
                                 <button onClick={() => toggleExpand(order.order_id)} className="text-blue-600 hover:text-blue-800">
-                                  {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                  {expanded[order.order_id] ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                                 </button>
-                                {!isRefunded && remaining > 0 && (
-                                  <button
-                                    onClick={() => openRefundModal(order)}
-                                    className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 transition"
-                                  >
-                                    <Undo2 size={14} />
-                                    Refund
+                                {!isCanceled && remaining > 0 && (
+                                  <button onClick={() => openRefundModal(order)} className="text-red-600 hover:text-red-800" title="Refund">
+                                    <Undo2 size={18} />
                                   </button>
                                 )}
                               </div>
                             </td>
-                          </motion.tr>
+                          </tr>
 
-                          {/* Expanded Items */}
-                          {isOpen && (
+                          {/* EXPANDED: Items by Category */}
+                          {expanded[order.order_id] && (
                             <tr>
-                              <td colSpan={8} className="bg-gray-50 p-4">
-                                <div className="space-y-2">
-                                  {order.items?.length > 0 ? (
-                                    order.items.map((it, i) => (
-                                      <div key={i} className="flex justify-between text-sm">
-                                        <span>#{it.food_id} {it.name}</span>
-                                        <span>{it.quantity} × ₹{it.price}</span>
+                              <td colSpan={8} className="bg-gray-50 p-6">
+                                <div className="space-y-6">
+                                  {/* Food Items */}
+                                  {order.items?.filter(i => i.category !== "cafe" && i.category !== "beverage").length > 0 && (
+                                    <div>
+                                      <h4 className="font-bold text-orange-700 mb-3 flex items-center gap-2">
+                                        <Package size={18} /> Food Items
+                                      </h4>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {order.items
+                                          .filter(i => i.category !== "cafe" && i.category !== "beverage")
+                                          .map((item, i) => (
+                                            <div key={i} className="bg-white p-3 rounded-lg shadow-sm flex justify-between text-sm">
+                                              <span className="font-medium">{item.name}</span>
+                                              <span className="text-orange-600 font-bold">
+                                                {item.quantity} × ₹{item.price}
+                                              </span>
+                                            </div>
+                                          ))}
                                       </div>
-                                    ))
-                                  ) : (
-                                    <p className="text-gray-500 italic">No items</p>
+                                    </div>
+                                  )}
+
+                                  {/* Cafe Items */}
+                                  {order.items?.filter(i => i.category === "cafe" || i.category === "beverage").length > 0 && (
+                                    <div>
+                                      <h4 className="font-bold text-teal-700 mb-3 flex items-center gap-2">
+                                        <Coffee size={18} /> Cafe Items
+                                      </h4>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {order.items
+                                          .filter(i => i.category === "cafe" || i.category === "beverage")
+                                          .map((item, i) => (
+                                            <div key={i} className="bg-white p-3 rounded-lg shadow-sm flex justify-between text-sm">
+                                              <span className="font-medium">{item.name}</span>
+                                              <span className="text-teal-600 font-bold">
+                                                {item.quantity} × ₹{item.price}
+                                              </span>
+                                            </div>
+                                          ))}
+                                      </div>
+                                    </div>
                                   )}
                                 </div>
                               </td>
@@ -309,67 +469,33 @@ const CompletedOrdersPage = () => {
         </motion.div>
       </main>
 
-      {/* REFUND MODAL */}
+      {/* Refund Modal */}
       {refundModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-2xl font-bold text-red-700">Issue Refund</h3>
-              <button onClick={() => setRefundModal(null)} className="text-gray-500 hover:text-gray-700">
-                <X size={24} />
-              </button>
-            </div>
-
+          <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-2xl font-bold text-red-700 mb-4">Issue Refund</h3>
             <div className="space-y-4">
               <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Order ID</p>
-                <p className="font-bold text-lg">#{refundModal.order.order_id}</p>
-                <p className="text-sm text-gray-600 mt-1">Table {refundModal.order.table_number}</p>
+                <p className="font-bold">Order #{refundModal.order.order_id}</p>
+                <p className="text-sm text-gray-600">Table {refundModal.order.table_number}</p>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Refund Amount</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  max={parseFloat(refundModal.order.total_amount) - (refundModal.order.refunded_amount || 0)}
-                  value={refundModal.amount}
-                  onChange={(e) => setRefundModal({ ...refundModal, amount: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                  placeholder="0.00"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Max: ₹{(parseFloat(refundModal.order.total_amount) - (refundModal.order.refunded_amount || 0)).toFixed(2)}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
-                <textarea
-                  rows={3}
-                  value={refundModal.reason}
-                  onChange={(e) => setRefundModal({ ...refundModal, reason: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-                  placeholder="e.g. Wrong order, customer unhappy..."
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => setRefundModal(null)}
-                  className="flex-1 py-3 border border-gray-300 rounded-xl font-medium hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleRefund}
-                  className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition"
-                >
+              <input
+                type="number"
+                value={refundModal.amount}
+                onChange={(e) => setRefundModal({ ...refundModal, amount: e.target.value })}
+                className="w-full px-4 py-3 border rounded-xl text-lg font-bold"
+                max={refundModal.order.total_amount - refundModal.order.refunded_amount}
+              />
+              <textarea
+                placeholder="Reason (optional)"
+                value={refundModal.reason}
+                onChange={(e) => setRefundModal({ ...refundModal, reason: e.target.value })}
+                className="w-full px-4 py-3 border rounded-xl"
+                rows={3}
+              />
+              <div className="flex gap-3">
+                <button onClick={() => setRefundModal(null)} className="flex-1 py-3 border rounded-xl font-bold">Cancel</button>
+                <button onClick={handleRefund} className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700">
                   Confirm Refund
                 </button>
               </div>
