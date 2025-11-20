@@ -244,13 +244,16 @@ class TableSeat(models.Model):
     @classmethod
     def mark_table_seats_available(cls, table_number):
         """Mark all seats of a table as available (when customers leave)"""
-        seats = cls.objects.filter(table__table_number=table_number)
-        updated_count = seats.update(is_available=True)
-        return updated_count
-
-    def __str__(self):
-        return f"Seat {self.seat_number} (Table {self.table.table_number}) - {'Available' if self.is_available else 'Occupied'}"    
-
+        try:
+            seats = cls.objects.filter(table__table_number=table_number)
+            print(f"Found {seats.count()} seats for table {table_number}")
+            updated_count = seats.update(is_available=True)
+            print(f"Updated {updated_count} seats to available")
+            return updated_count
+        except Exception as e:
+            print(f"Error in mark_table_seats_available: {str(e)}")
+            return 0
+                
 class SubCategory(models.Model):
     subcategory_id = models.AutoField(primary_key=True)
     subcategory_name = models.CharField(max_length=100, unique=True)
