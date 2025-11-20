@@ -5,7 +5,7 @@ from datetime import timedelta
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from management.models import AdminUser, EmailOTP,FoodItem,RestaurantTable,SubCategory
+from management.models import AdminUser, EmailOTP,FoodItem,RestaurantTable,SubCategory,TableSeat
 from django.contrib.auth.hashers import make_password
 import logging
 from django.contrib.auth import authenticate
@@ -13,7 +13,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
-from .serializers import FoodItemSerializer,RestaurantTableSerializer,SubCategorySerializer
+from .serializers import FoodItemSerializer,RestaurantTableSerializer,SubCategorySerializer,TableSeatSerializer
 from cashier.models import Order, OrderItem
 from django.db.models import Q
 from django.http import HttpResponse
@@ -477,11 +477,19 @@ class SubCategoryViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+
+from rest_framework import viewsets, status, permissions
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django.db.models import Exists, OuterRef
+from .models import RestaurantTable, TableSeat
+from .serializers import RestaurantTableSerializer, TableSeatSerializer
+
 class RestaurantTableViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for managing restaurant tables 
+    ViewSet for managing restaurant tables with seats
     """
-    queryset = RestaurantTable.objects.filter(is_active=True).order_by('table_number')
+    queryset = RestaurantTable.objects.filter(is_active=True).prefetch_related('seats')
     serializer_class = RestaurantTableSerializer
     permission_classes = [permissions.AllowAny]
 
@@ -489,6 +497,7 @@ class RestaurantTableViewSet(viewsets.ModelViewSet):
         """Soft delete implementation"""
         instance.is_active = False
         instance.save()
+
     @action(detail=False, methods=['get'], url_path='active-numbers')
     def active_numbers(self, request):
         """
@@ -497,6 +506,171 @@ class RestaurantTableViewSet(viewsets.ModelViewSet):
         """
         tables = self.get_queryset().values('table_id', 'table_number')
         return Response(list(tables))
+
+    @action(detail=True, methods=['get'], url_path='seats')
+    def table_seats(self, request, pk=None):
+        """Get all seats for a specific table"""
+        table = self.get_object()
+        seats = table.seats.all()
+        serializer = TableSeatSerializer(seats, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='update-availability')
+    def update_seat_availability(self, request, pk=None):
+        """Update seat availability in bulk"""
+        table = self.get_object()
+        seat_updates = request.data.get('seat_updates', [])
+        
+        updated_seats = []
+        for update in seat_updates:
+            try:
+                seat = table.seats.get(seat_number=update['seat_number'])
+                seat.is_available = update['is_available']
+                seat.save()
+                updated_seats.append(seat.seat_number)
+            except TableSeat.DoesNotExist:
+                continue
+        
+        return Response({
+            'message': f'Updated {len(updated_seats)} seats',
+            'updated_seats': updated_seats
+        })
+
+    @action(detail=False, methods=['get'], url_path='table-seats/(?P<table_number>\d+)')
+    def table_seats_by_number(self, request, table_number=None):
+        """Get all seats for a specific table by table number"""
+        try:
+            table = RestaurantTable.objects.get(table_number=table_number, is_active=True)
+            seats = table.seats.all()
+            serializer = TableSeatSerializer(seats, many=True)
+            return Response(serializer.data)
+        except RestaurantTable.DoesNotExist:
+            return Response(
+                {"error": f"Table {table_number} not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=False, methods=['post'], url_path='mark-table-available')
+    def mark_table_available(self, request):
+        """Mark all seats of a table as available (when customers leave)"""
+        table_number = request.data.get('table_number')
+        if not table_number:
+            return Response(
+                {"error": "table_number is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            updated_count = TableSeat.objects.filter(
+                table__table_number=table_number
+            ).update(is_available=True)
+            
+            return Response({
+                "message": f"All seats for Table {table_number} marked as available",
+                "updated_seats": updated_count
+            })
+        except Exception as e:
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    # NEW: Get occupied tables
+    @action(detail=False, methods=['get'], url_path='occupied-tables')
+    def occupied_tables(self, request):
+        """Get all tables with occupied seats"""
+        # Get tables that have at least one occupied seat
+        tables_with_occupied_seats = RestaurantTable.objects.filter(
+            is_active=True,
+            seats__is_available=False
+        ).distinct().values('table_id', 'table_number')
+        
+        return Response(list(tables_with_occupied_seats))
+
+    # NEW: Mark individual seat as available
+    @action(detail=False, methods=['post'], url_path='mark-seat-available')
+    def mark_seat_available(self, request):
+        """Mark specific seat as available"""
+        seat_number = request.data.get('seat_number')
+        table_number = request.data.get('table_number')
+        
+        if not seat_number or not table_number:
+            return Response(
+                {"error": "seat_number and table_number are required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            seat = TableSeat.objects.get(
+                seat_number=seat_number,
+                table__table_number=table_number,
+                table__is_active=True
+            )
+            seat.is_available = True
+            seat.save()
+            
+            return Response({
+                "message": f"Seat {seat_number} marked as available",
+                "seat_number": seat_number,
+                "table_number": table_number,
+                "is_available": True
+            })
+        except TableSeat.DoesNotExist:
+            return Response(
+                {"error": f"Seat {seat_number} not found in table {table_number}"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    # NEW: Get table details with seat occupancy summary
+    @action(detail=False, methods=['get'], url_path='table-occupancy')
+    def table_occupancy(self, request):
+        """Get table occupancy summary"""
+        tables = RestaurantTable.objects.filter(is_active=True).prefetch_related('seats')
+        
+        occupancy_data = []
+        for table in tables:
+            total_seats = table.seats.count()
+            available_seats = table.seats.filter(is_available=True).count()
+            occupied_seats = total_seats - available_seats
+            
+            occupancy_data.append({
+                'table_id': table.table_id,
+                'table_number': table.table_number,
+                'total_seats': total_seats,
+                'available_seats': available_seats,
+                'occupied_seats': occupied_seats,
+                'occupancy_rate': f"{(occupied_seats/total_seats)*100:.1f}%" if total_seats > 0 else "0%"
+            })
+        
+        return Response(occupancy_data)
+  
+class TableSeatViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing individual table seats
+    """
+    queryset = TableSeat.objects.all()
+    serializer_class = TableSeatSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        queryset = TableSeat.objects.all()
+        table_id = self.request.query_params.get('table_id')
+        if table_id:
+            queryset = queryset.filter(table_id=table_id)
+        return queryset
+
+    @action(detail=True, methods=['post'], url_path='toggle-availability')
+    def toggle_availability(self, request, pk=None):
+        """Toggle seat availability"""
+        seat = self.get_object()
+        seat.is_available = not seat.is_available
+        seat.save()
+        
+        return Response({
+            'seat_number': seat.seat_number,
+            'is_available': seat.is_available,
+            'message': f'Seat {seat.seat_number} is now {"available" if seat.is_available else "occupied"}'
+        })
 
 class OrderHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.AllowAny]

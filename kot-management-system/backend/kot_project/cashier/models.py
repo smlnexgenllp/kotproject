@@ -26,6 +26,11 @@ class Order(models.Model):
     )
     order_id = models.AutoField(primary_key=True)
     table_number = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    
+    # NEW: Store seat information
+    selected_seats = models.JSONField(default=list, blank=True, help_text="List of selected seat numbers")
+    table_id = models.IntegerField(null=True, blank=True, help_text="Reference to RestaurantTable")
+    
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
     received_amount = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
     balance_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, editable=False)
@@ -67,7 +72,8 @@ class Order(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"Order #{self.order_id} - Table {self.table_number}"
+        seats_info = f" - Seats: {', '.join(self.selected_seats)}" if self.selected_seats else ""
+        return f"Order #{self.order_id} - Table {self.table_number}{seats_info}"
 
 
 class OrderItem(models.Model):
