@@ -17,32 +17,42 @@ import {
   Table,
   User,
   Image,
+  Users,
+  Armchair
 } from "lucide-react";
 import axios from "axios";
 import Navbar from "./Navbar";
 
 const API_URL = "http://127.0.0.1:8000/api/food-menu/";
 const TABLES_API = "http://127.0.0.1:8000/api/tables/active-numbers/";
+const TABLE_SEATS_API = "http://127.0.0.1:8000/api/tables/table-seats/";
+const OCCUPIED_TABLES_API = "http://127.0.0.1:8000/api/tables/occupied-tables/";
+const MARK_SEAT_AVAILABLE_API = "http://127.0.0.1:8000/api/tables/mark-seat-available/";
 
 export default function MenuPage() {
   const navigate = useNavigate();
 
   const [tableNumber, setTableNumber] = useState("");
+  const [selectedSeats, setSelectedSeats] = useState([]);
   const [cart, setCart] = useState([]);
   const [search, setSearch] = useState("");
   const [activeCat, setActiveCat] = useState("all");
   const [showCartModal, setShowCartModal] = useState(false);
   const [showTableModal, setShowTableModal] = useState(false);
+  const [showSeatsModal, setShowSeatsModal] = useState(false);
   const [menuItems, setMenuItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [user] = useState(JSON.parse(localStorage.getItem("user") || "{}"));
 
-  // NEW: Dynamic tables state
+  // Tables state
   const [activeTables, setActiveTables] = useState([]);
+  const [occupiedTables, setOccupiedTables] = useState([]); // NEW: Occupied tables state
+  const [tableSeats, setTableSeats] = useState([]);
   const [tablesLoading, setTablesLoading] = useState(true);
   const [tablesError, setTablesError] = useState("");
+  const [seatsLoading, setSeatsLoading] = useState(false);
 
   // Fetch Menu + Categories
   useEffect(() => {
@@ -99,6 +109,98 @@ export default function MenuPage() {
     fetchTables();
   }, []);
 
+  // NEW: Fetch occupied tables
+  const fetchOccupiedTables = async () => {
+    try {
+      const res = await axios.get(OCCUPIED_TABLES_API);
+      setOccupiedTables(res.data);
+    } catch (err) {
+      console.error("Error fetching occupied tables:", err);
+      setOccupiedTables([]);
+    }
+  };
+
+  // Fetch occupied tables on component mount and when seats change
+  useEffect(() => {
+    fetchOccupiedTables();
+  }, []);
+
+  // Fetch seats when table is selected
+  const fetchTableSeats = async (tableNum) => {
+    try {
+      setSeatsLoading(true);
+      const res = await axios.get(`${TABLE_SEATS_API}${tableNum}/`);
+      setTableSeats(res.data);
+    } catch (err) {
+      console.error("Error fetching seats:", err);
+      setTableSeats([]);
+    } finally {
+      setSeatsLoading(false);
+    }
+  };
+
+  // Handle table selection
+  const handleTableSelect = async (table) => {
+    setTableNumber(table.table_number);
+    await fetchTableSeats(table.table_number);
+    setShowTableModal(false);
+    setShowSeatsModal(true);
+  };
+
+  // NEW: Handle occupied table selection
+  const handleOccupiedTableSelect = async (table) => {
+    setTableNumber(table.table_number);
+    await fetchTableSeats(table.table_number);
+    setShowSeatsModal(true);
+  };
+
+  // NEW: Mark individual seat as available
+  const markSeatAvailable = async (seatNumber) => {
+    try {
+      await axios.post(MARK_SEAT_AVAILABLE_API, {
+        seat_number: seatNumber,
+        table_number: tableNumber
+      });
+      
+      // Refresh seats data and occupied tables
+      await fetchTableSeats(tableNumber);
+      await fetchOccupiedTables();
+    } catch (err) {
+      console.error("Error marking seat available:", err);
+      alert("Failed to mark seat as available");
+    }
+  };
+
+  // UPDATED: Handle seat selection - allow marking occupied seats as available
+  const handleSeatSelect = async (seat) => {
+    if (!seat.is_available) {
+      // If seat is occupied, ask to mark it as available
+      if (window.confirm(`Do you want to mark seat ${seat.seat_number} as available? This will free up the seat for new orders.`)) {
+        await markSeatAvailable(seat.seat_number);
+      }
+      return;
+    }
+
+    // If seat is available, select it for ordering
+    setSelectedSeats(prev => {
+      const isAlreadySelected = prev.some(s => s.seat_id === seat.seat_id);
+      if (isAlreadySelected) {
+        return prev.filter(s => s.seat_id !== seat.seat_id);
+      } else {
+        return [...prev, seat];
+      }
+    });
+  };
+
+  // Confirm seat selection
+  const confirmSeatSelection = () => {
+    if (selectedSeats.length === 0) {
+      alert("Please select at least one seat.");
+      return;
+    }
+    setShowSeatsModal(false);
+  };
+
   const filtered = useMemo(() => {
     return menuItems.filter((i) => {
       const matchesSearch = i.name.toLowerCase().includes(search.toLowerCase());
@@ -135,7 +237,6 @@ export default function MenuPage() {
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  // WRONG — may use stale `cart`
   const getCartQuantity = (itemId) => {
     const cartItem = cart.find((item) => item.id === itemId);
     return cartItem ? cartItem.quantity : 0;
@@ -167,47 +268,53 @@ export default function MenuPage() {
     return null;
   };
 
- const handleProceed = async () => {
-  if (!tableNumber.trim()) {
-    setShowTableModal(true);
-    return;
-  }
-  if (cart.length === 0) {
-    alert("Cart is empty!");
-    return;
-  }
+  const handleProceed = async () => {
+    if (!tableNumber.trim()) {
+      setShowTableModal(true);
+      return;
+    }
+    if (selectedSeats.length === 0) {
+      alert("Please select seats first!");
+      return;
+    }
+    if (cart.length === 0) {
+      alert("Cart is empty!");
+      return;
+    }
 
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
-  if (!user.id) {
-    alert("Waiter not logged in!");
-    return;
-  }
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    if (!user.id) {
+      alert("Waiter not logged in!");
+      return;
+    }
 
-  const orderData = {
-    tableNumber: parseInt(tableNumber),
-    total: total,
-    cart: cart.map((item) => ({
-      food_id: item.food_id,
-      name: item.name,
-      quantity: item.quantity,
-      price: item.price,
-    })),
-    paymentMode: "cash",
-    received_amount: total,
-    waiter_id: user.id,
+    // Get table ID for reference
+    const table = activeTables.find(t => t.table_number.toString() === tableNumber.toString());
+
+    navigate("/payment", {
+      state: {
+        tableNumber,
+        selectedSeats,
+        tableId: table?.table_id,
+        cart,
+        total,
+        waiter_name: user.name || "",
+        waiter_id: user.id,
+      },
+    });
   };
 
-  navigate("/payment", {
-    state: {
-      tableNumber,
-      cart,
-      total,
-      orderData,  
-      waiter_name: user.name || "",
-    },
-  });
-};
-
+  // Group seats by row for display
+  const groupSeatsByRow = (seats) => {
+    const grouped = {};
+    seats.forEach(seat => {
+      if (!grouped[seat.row_number]) {
+        grouped[seat.row_number] = [];
+      }
+      grouped[seat.row_number].push(seat);
+    });
+    return grouped;
+  };
 
   if (loading)
     return (
@@ -248,6 +355,9 @@ export default function MenuPage() {
         onShowCart={() => setShowCartModal(true)}
         tableNumber={tableNumber}
         onShowTable={() => setShowTableModal(true)}
+        selectedSeats={selectedSeats}
+        occupiedTables={occupiedTables} // NEW: Pass occupied tables
+        onOccupiedTableSelect={handleOccupiedTableSelect} // NEW: Pass handler
       />
 
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-6">
@@ -452,7 +562,7 @@ export default function MenuPage() {
         </div>
       </div>
 
-      {/* ==================== DYNAMIC TABLE MODAL ==================== */}
+      {/* ==================== TABLE SELECTION MODAL ==================== */}
       <AnimatePresence>
         {showTableModal && (
           <motion.div
@@ -474,9 +584,9 @@ export default function MenuPage() {
                   <Table className="text-blue-600" size={32} />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  Table Number
+                  Select Table
                 </h3>
-                <p className="text-gray-600">Select your table to continue</p>
+                <p className="text-gray-600">Choose a table to continue</p>
               </div>
 
               <div className="space-y-4">
@@ -495,7 +605,7 @@ export default function MenuPage() {
                     {activeTables.map((table) => (
                       <button
                         key={table.table_id}
-                        onClick={() => setTableNumber(table.table_number)}
+                        onClick={() => handleTableSelect(table)}
                         className={`py-2 rounded-lg font-semibold transition-all ${
                           tableNumber === table.table_number
                             ? "bg-blue-600 text-white shadow-lg"
@@ -507,27 +617,147 @@ export default function MenuPage() {
                     ))}
                   </div>
                 )}
-
-                <button
-                  onClick={() => {
-                    if (tableNumber.trim()) setShowTableModal(false);
-                  }}
-                  disabled={!tableNumber.trim()}
-                  className={`w-full py-3 rounded-xl font-bold text-white transition-all ${
-                    tableNumber.trim()
-                      ? "bg-blue-600 hover:bg-blue-700 shadow-lg"
-                      : "bg-gray-400 cursor-not-allowed"
-                  }`}
-                >
-                  Confirm Table
-                </button>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ==================== CART MODAL (unchanged) ==================== */}
+      {/* ==================== UPDATED SEAT SELECTION MODAL ==================== */}
+      <AnimatePresence>
+        {showSeatsModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowSeatsModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Armchair className="text-green-600" size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  Manage Seats - Table {tableNumber}
+                </h3>
+                <p className="text-gray-600">
+                  • Click <span className="text-green-600 font-semibold">available seats</span> to select for ordering<br/>
+                  • Click <span className="text-red-600 font-semibold">occupied seats</span> to mark them as available
+                </p>
+              </div>
+
+              {/* Seat Status Legend */}
+              <div className="flex justify-center gap-4 mb-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-green-500 border-2 border-green-600 rounded"></div>
+                  <span>Selected</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-green-50 border-2 border-green-200 rounded"></div>
+                  <span>Available</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-red-50 border-2 border-red-200 rounded"></div>
+                  <span>Occupied (Click to free)</span>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                {seatsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="animate-spin text-green-600" size={32} />
+                  </div>
+                ) : tableSeats.length === 0 ? (
+                  <p className="text-center text-gray-600">No seats found for this table</p>
+                ) : (
+                  Object.entries(groupSeatsByRow(tableSeats)).map(([rowNumber, seats]) => (
+                    <div key={rowNumber} className="space-y-3">
+                      <h4 className="font-semibold text-gray-700 border-b pb-2">Row {rowNumber}</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {seats.map(seat => (
+                          <button
+                            key={seat.seat_id}
+                            onClick={() => handleSeatSelect(seat)}
+                            className={`p-3 rounded-lg border-2 transition-all duration-200 ${
+                              selectedSeats.some(s => s.seat_id === seat.seat_id)
+                                ? 'bg-green-500 border-green-600 text-white shadow-lg transform scale-105'
+                                : seat.is_available
+                                ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300 hover:scale-105'
+                                : 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100 hover:border-red-300 hover:scale-105 cursor-pointer'
+                            }`}
+                          >
+                            <div className="text-center">
+                              <div className="font-bold text-sm mb-1">Seat {seat.seat_number}</div>
+                              <div className={`text-xs px-2 py-1 rounded-full ${
+                                selectedSeats.some(s => s.seat_id === seat.seat_id)
+                                  ? 'bg-green-600 text-white'
+                                  : seat.is_available
+                                  ? 'bg-green-200 text-green-800'
+                                  : 'bg-red-200 text-red-800'
+                              }`}>
+                                {selectedSeats.some(s => s.seat_id === seat.seat_id)
+                                  ? '✓ Selected'
+                                  : seat.is_available
+                                  ? 'Available'
+                                  : 'Occupied'
+                                }
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between text-sm mb-4">
+                  <span className="text-gray-600">Selected Seats for Order:</span>
+                  <span className="font-semibold text-green-700">
+                    {selectedSeats.length > 0 
+                      ? selectedSeats.map(s => s.seat_number).join(', ')
+                      : 'None selected'
+                    }
+                  </span>
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setSelectedSeats([]);
+                      setShowSeatsModal(false);
+                    }}
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl text-center font-medium text-gray-700 hover:bg-gray-50 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmSeatSelection}
+                    disabled={selectedSeats.length === 0}
+                    className={`flex-1 px-4 py-3 rounded-xl font-bold text-white transition-all ${
+                      selectedSeats.length > 0
+                        ? "bg-green-500 hover:bg-green-600 shadow-lg"
+                        : "bg-gray-400 cursor-not-allowed"
+                    }`}
+                  >
+                    Confirm {selectedSeats.length} Seat{selectedSeats.length !== 1 ? 's' : ''}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ==================== CART MODAL ==================== */}
       <AnimatePresence>
         {showCartModal && (
           <motion.div
@@ -548,7 +778,10 @@ export default function MenuPage() {
                 <div>
                   <h2 className="text-xl font-bold">Your Order</h2>
                   <p className="text-blue-100 text-sm">
-                    {tableNumber ? `Table ${tableNumber}` : "No table selected"}
+                    {tableNumber 
+                      ? `Table ${tableNumber} - Seats: ${selectedSeats.map(s => s.seat_number).join(', ') || 'Not selected'}`
+                      : "No table selected"
+                    }
                   </p>
                 </div>
                 <button
@@ -627,12 +860,15 @@ export default function MenuPage() {
                     whileTap={{ scale: 0.98 }}
                     onClick={handleProceed}
                     className={`w-full py-3 rounded-xl font-bold text-white transition-all ${
-                      tableNumber.trim()
+                      tableNumber.trim() && selectedSeats.length > 0
                         ? "bg-green-500 hover:bg-green-600 shadow-lg"
                         : "bg-gray-400 cursor-not-allowed"
                     }`}
                   >
-                    {tableNumber.trim() ? "Proceed to Payment" : "Select Table"}
+                    {tableNumber.trim() && selectedSeats.length > 0 
+                      ? "Proceed to Payment" 
+                      : "Select Table & Seats"
+                    }
                   </motion.button>
                 </div>
               )}

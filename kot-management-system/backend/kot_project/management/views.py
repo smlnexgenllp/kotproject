@@ -478,6 +478,13 @@ class SubCategoryViewSet(viewsets.ModelViewSet):
 
 
 
+from rest_framework import viewsets, status, permissions
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django.db.models import Exists, OuterRef
+from .models import RestaurantTable, TableSeat
+from .serializers import RestaurantTableSerializer, TableSeatSerializer
+
 class RestaurantTableViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing restaurant tables with seats
@@ -529,7 +536,114 @@ class RestaurantTableViewSet(viewsets.ModelViewSet):
             'updated_seats': updated_seats
         })
 
+    @action(detail=False, methods=['get'], url_path='table-seats/(?P<table_number>\d+)')
+    def table_seats_by_number(self, request, table_number=None):
+        """Get all seats for a specific table by table number"""
+        try:
+            table = RestaurantTable.objects.get(table_number=table_number, is_active=True)
+            seats = table.seats.all()
+            serializer = TableSeatSerializer(seats, many=True)
+            return Response(serializer.data)
+        except RestaurantTable.DoesNotExist:
+            return Response(
+                {"error": f"Table {table_number} not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=False, methods=['post'], url_path='mark-table-available')
+    def mark_table_available(self, request):
+        """Mark all seats of a table as available (when customers leave)"""
+        table_number = request.data.get('table_number')
+        if not table_number:
+            return Response(
+                {"error": "table_number is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            updated_count = TableSeat.objects.filter(
+                table__table_number=table_number
+            ).update(is_available=True)
+            
+            return Response({
+                "message": f"All seats for Table {table_number} marked as available",
+                "updated_seats": updated_count
+            })
+        except Exception as e:
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
+    # NEW: Get occupied tables
+    @action(detail=False, methods=['get'], url_path='occupied-tables')
+    def occupied_tables(self, request):
+        """Get all tables with occupied seats"""
+        # Get tables that have at least one occupied seat
+        tables_with_occupied_seats = RestaurantTable.objects.filter(
+            is_active=True,
+            seats__is_available=False
+        ).distinct().values('table_id', 'table_number')
+        
+        return Response(list(tables_with_occupied_seats))
+
+    # NEW: Mark individual seat as available
+    @action(detail=False, methods=['post'], url_path='mark-seat-available')
+    def mark_seat_available(self, request):
+        """Mark specific seat as available"""
+        seat_number = request.data.get('seat_number')
+        table_number = request.data.get('table_number')
+        
+        if not seat_number or not table_number:
+            return Response(
+                {"error": "seat_number and table_number are required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            seat = TableSeat.objects.get(
+                seat_number=seat_number,
+                table__table_number=table_number,
+                table__is_active=True
+            )
+            seat.is_available = True
+            seat.save()
+            
+            return Response({
+                "message": f"Seat {seat_number} marked as available",
+                "seat_number": seat_number,
+                "table_number": table_number,
+                "is_available": True
+            })
+        except TableSeat.DoesNotExist:
+            return Response(
+                {"error": f"Seat {seat_number} not found in table {table_number}"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    # NEW: Get table details with seat occupancy summary
+    @action(detail=False, methods=['get'], url_path='table-occupancy')
+    def table_occupancy(self, request):
+        """Get table occupancy summary"""
+        tables = RestaurantTable.objects.filter(is_active=True).prefetch_related('seats')
+        
+        occupancy_data = []
+        for table in tables:
+            total_seats = table.seats.count()
+            available_seats = table.seats.filter(is_available=True).count()
+            occupied_seats = total_seats - available_seats
+            
+            occupancy_data.append({
+                'table_id': table.table_id,
+                'table_number': table.table_number,
+                'total_seats': total_seats,
+                'available_seats': available_seats,
+                'occupied_seats': occupied_seats,
+                'occupancy_rate': f"{(occupied_seats/total_seats)*100:.1f}%" if total_seats > 0 else "0%"
+            })
+        
+        return Response(occupancy_data)
+  
 class TableSeatViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing individual table seats

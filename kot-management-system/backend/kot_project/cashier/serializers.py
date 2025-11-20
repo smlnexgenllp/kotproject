@@ -42,6 +42,8 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = [
             'order_id',
             'table_number',
+            'table_id',  # NEW
+            'selected_seats',  # NEW
             'total_amount',
             'received_amount',
             'balance_amount',

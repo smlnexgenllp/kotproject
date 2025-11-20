@@ -8,13 +8,14 @@ import {
   Loader2,
   Smartphone,
   CheckCircle,
+  Users
 } from "lucide-react";
 import Navbar from "./Navbar.jsx";
 
 export default function PaymentPage() {
   const navigate = useNavigate();
   const { state } = useLocation();
-  const { tableNumber, cart } = state || {};
+  const { tableNumber, cart, selectedSeats = [], tableId } = state || {};
   const [loading, setLoading] = useState(false);
   const [cashAmount, setCashAmount] = useState("");
   const [showCashInput, setShowCashInput] = useState(false);
@@ -39,22 +40,33 @@ export default function PaymentPage() {
     if (submittingRef.current) return;
     submittingRef.current = true;
 
-    // build full cart
+    // Debug: Check what's in the cart
+    console.log("Cart items:", cart);
+    console.log("Selected seats:", selectedSeats);
+
+    // build full cart - FIXED: Ensure food_id is included
     const fullCart = cart.map((item) => ({
-      food_id: item.food_id,
+      food_id: item.food_id || item.id, // Try both food_id and id as fallback
       name: item.name,
       quantity: item.quantity,
       price: item.price,
     }));
 
+    console.log("Full cart being sent:", fullCart);
+
+    // FIXED: Use correct field names that match Django model
     const payload = {
-      tableNumber: parseInt(tableNumber),
-      total,
-      paymentMode: mode === "Online" ? method.toLowerCase() : "cash",
+      table_number: parseInt(tableNumber), // Changed from tableNumber
+      total_amount: total, // Changed from total
+      payment_mode: mode === "Online" ? method.toLowerCase() : "cash", // Changed from paymentMode
       received_amount: mode === "Online" ? total : received,
-      waiter_id: JSON.parse(localStorage.getItem("user") || "{}").id,
+      waiter: JSON.parse(localStorage.getItem("user") || "{}").id, // Changed from waiter_id
       cart: fullCart,
+      selected_seats: selectedSeats.map(seat => seat.seat_number), // Changed from selectedSeats
+      table_id: tableId,
     };
+
+    console.log("Final payload:", payload);
 
     setLoading(true);
 
@@ -64,11 +76,11 @@ export default function PaymentPage() {
         payload
       );
 
-      //  ✅ SAME FLOW FOR CASH & ONLINE (PENDING ORDER)
       navigate("/cashier-wait", {
         state: {
           orderId: res.data.order_id,
           tableNumber,
+          selectedSeats,
           total,
           received: mode === "Online" ? total : received,
           balance: mode === "Online" ? 0 : balance > 0 ? balance : 0,
@@ -78,9 +90,10 @@ export default function PaymentPage() {
       });
     } catch (err) {
       setLoading(false);
+      console.error("Payment error details:", err.response?.data);
       alert(
         "Failed to process payment: " +
-          (err.response?.data?.detail || err.message)
+          (err.response?.data?.detail || err.response?.data || err.message)
       );
       submittingRef.current = false;
     }
@@ -91,9 +104,18 @@ export default function PaymentPage() {
       <Navbar />
       <div className="min-h-screen bg-gradient-to-br from-blue-200 to-indigo-100 flex items-center justify-center p-6">
         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8">
-          <h1 className="text-3xl font-bold text-center text-indigo-700 mb-6">
-            Table {tableNumber}
-          </h1>
+          {/* Table and Seat Information */}
+          <div className="text-center mb-6">
+            <h1 className="text-3xl font-bold text-indigo-700 mb-2">
+              Table {tableNumber}
+            </h1>
+            {selectedSeats && selectedSeats.length > 0 && (
+              <div className="flex items-center justify-center gap-2 text-green-600 font-semibold">
+                <Users size={20} />
+                <span>Seats: {selectedSeats.map(s => s.seat_number).join(', ')}</span>
+              </div>
+            )}
+          </div>
 
           {/* TOTAL BILL */}
           <div className="bg-gray-50 rounded-2xl p-6 mb-3">
@@ -103,7 +125,7 @@ export default function PaymentPage() {
             <p className="text-gray-600 text-right">Total Bill</p>
           </div>
 
-          {/* CART LIST */}
+          {/* CART LIST - FIXED: Show food_id or id */}
           <div className="max-h-56 overflow-y-auto bg-gray-50 rounded-2xl p-4 mb-6 space-y-2">
             {cart.map((item) => (
               <div
@@ -111,7 +133,7 @@ export default function PaymentPage() {
                 className="flex items-center justify-between text-sm border-b border-gray-200 pb-2 last:border-0"
               >
                 <div className="flex items-center gap-4">
-                  <span className="font-medium">#{item.food_id}</span>
+                  <span className="font-medium">#{item.food_id || item.id}</span>
                   <span className="truncate max-w-[140px]">{item.name}</span>
                 </div>
                 <div className="text-right">
