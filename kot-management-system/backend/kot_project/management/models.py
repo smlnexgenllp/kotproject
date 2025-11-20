@@ -240,7 +240,16 @@ class TableSeat(models.Model):
         ordering = ['row_number', 'seat_label']
 
     def __str__(self):
-        return f"Seat {self.seat_number} (Table {self.table.table_number})"      
+        return f"Seat {self.seat_number} (Table {self.table.table_number})"    
+    @classmethod
+    def mark_table_seats_available(cls, table_number):
+        """Mark all seats of a table as available (when customers leave)"""
+        seats = cls.objects.filter(table__table_number=table_number)
+        updated_count = seats.update(is_available=True)
+        return updated_count
+
+    def __str__(self):
+        return f"Seat {self.seat_number} (Table {self.table.table_number}) - {'Available' if self.is_available else 'Occupied'}"    
 
 class SubCategory(models.Model):
     subcategory_id = models.AutoField(primary_key=True)
