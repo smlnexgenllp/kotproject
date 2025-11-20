@@ -7,34 +7,34 @@ export default function OrderSuccess() {
   const { state } = useLocation();
   const navigate = useNavigate();
 
-  // SAFE DEFAULT VALUES — NO MORE "undefined" ERRORS!
   const {
      orderId = "N/A",
     tableNumber = "N/A",
+    selected_seats="N/A",
     total = 0,
     mode = "Unknown",
-    received = total, // fallback if not sent
-    balance = 0, // change amount
+    received = total, 
+    balance = 0, 
   } = state || {};
 
   return (
     <>
     <Navbar/>
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-2xl overflow-hidden max-w-md w-full transform transition-all hover:scale-[1.02]">
         {/* SUCCESS HEADER */}
-        <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-8 text-white text-center">
-          <CheckCircle size={64} className="mx-auto mb-4 animate-bounce" />
+        <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-4 text-white text-center">
+          <CheckCircle size={64} className="mx-auto mb-2 animate-bounce" />
           <h1 className="text-4xl font-bold">Order Placed Successfully!</h1>
           <p className="text-xl mt-2 opacity-90">Table {tableNumber}</p>
           <div className="flex justify-between text-lg">
-  <span className="font-semibold text-gray-700">Order ID:{orderId}</span>
+  <span className="font-semibold ml-24 pl-14 text-gray-700">Order ID:{orderId}</span>
 </div>
         </div>
 
         {/* DETAILS */}
-        <div className="p-8 space-y-6">
-          <div className="bg-gray-50 rounded-2xl p-6 space-y-4">
+        <div className="p-6 space-y-6">
+          <div className="bg-gray-50 rounded-2xl p-4 space-y-4">
             <div className="flex justify-between text-lg">
               <span className="font-semibold text-gray-700">Bill Amount:</span>
               <span className="font-bold text-xl">

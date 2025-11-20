@@ -13,7 +13,7 @@ class AdminUser(AbstractUser):
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='waiter')
     phone = models.CharField(max_length=15, blank=True, null=True)
-    is_verified = models.BooleanField(default=False)  # Email verified?
+    is_verified = models.BooleanField(default=False)  
 
     groups = models.ManyToManyField(
         'auth.Group', related_name='adminuser_groups', blank=True
