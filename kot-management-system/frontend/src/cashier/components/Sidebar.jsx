@@ -3,7 +3,12 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  LayoutDashboard, ShoppingCart, CheckCircle, Settings, LogOut
+  LayoutDashboard, 
+  ShoppingCart, 
+  CheckCircle, 
+  Settings, 
+  LogOut,
+  Table
 } from "lucide-react";
 
 const Sidebar = ({ active, onLogout }) => {
@@ -12,6 +17,7 @@ const Sidebar = ({ active, onLogout }) => {
 
   const menuItems = [
     { id: "dashboard", label: "Cashier Dashboard", icon: LayoutDashboard, path: "/cashier" },
+    { id: "tables", label: "Table Management", icon: Table, path: "/cashier/tablemanage" }, // Fixed: added leading slash
     { id: "pending", label: "Pending Orders", icon: ShoppingCart, path: "/cashier/pending-orders" },
     { id: "completed", label: "Completed Orders", icon: CheckCircle, path: "/cashier/completed-orders" },
     { id: "settings", label: "Settings", icon: Settings },
