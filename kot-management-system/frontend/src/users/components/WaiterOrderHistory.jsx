@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import {
   ArrowLeft,
   Search,
@@ -83,6 +84,7 @@ const WaiterOrderHistory = () => {
   const [dateFilter, setDateFilter] = useState("today"); // NEW
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
+    const [openSeats, setOpenSeats] = useState({});
   const navigate = useNavigate();
 
   const userStr = localStorage.getItem("user");
@@ -369,14 +371,39 @@ const WaiterOrderHistory = () => {
                         <td className="px-6 py-4 font-bold text-blue-900">
                           #{order.order_id}
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <TableIcon size={16} className="text-blue-600" />
-                            <span className="font-semibold">
-                              {order.table_number}
-                            </span>
-                          </div>
-                        </td>
+                        <td className="px-6 py-4 font-semibold">
+                              <div className="flex items-center gap-2">
+                                <span>Table {order.table_number}</span>
+
+                                {/* Dropdown icon */}
+                                {order.selected_seats &&
+                                  order.selected_seats.length > 0 && (
+                                    <button
+                                      onClick={() =>
+                                        setOpenSeats((prev) => ({
+                                          ...prev,
+                                          [order.id]: !prev[order.id],
+                                        }))
+                                      }
+                                      className="p-1 hover:bg-gray-200 rounded"
+                                    >
+                                      {openSeats[order.id] ? (
+                                        <ChevronUp size={16} />
+                                      ) : (
+                                        <ChevronDown size={16} />
+                                      )}
+                                    </button>
+                                  )}
+                              </div>
+
+                              {/* Seats Dropdown Content */}
+                              {openSeats[order.id] && (
+                                <div className="mt-1 text-xs text-gray-700 bg-gray-100 p-2 rounded">
+                                  Seats: {order.selected_seats.join(", ")}
+                                </div>
+                              )}
+                            </td>
+                        
                         <td className="px-6 py-4 text-center">
                           {order.items?.length || 0}
                         </td>

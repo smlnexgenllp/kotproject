@@ -66,6 +66,7 @@ const PendingOrderCard = ({ order, onPaid, onPrint, onCancel }) => {
             </div>
             <div>
               <h3 className="text-xl font-bold">Table {order.table_number}</h3>
+               <p className="text-sm">Seats:{order.selected_seats}</p>
               <p className="text-blue-100 text-sm">
                 #{order.order_id} • {new Date(order.created_at).toLocaleTimeString()}
               </p>
