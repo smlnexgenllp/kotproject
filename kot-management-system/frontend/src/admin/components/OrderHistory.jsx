@@ -16,6 +16,13 @@ const OrderHistory = () => {
     search: '',
   });
   const [viewMode, setViewMode] = useState('all');
+  const [summary, setSummary] = useState({
+    totalCollection: 0,
+    foodCollection: 0,
+    cafeCollection: 0,
+    refundAmount: 0,
+    netCollection: 0
+  });
 
   // Helpers
   const getDateString = (date) => date.toISOString().split('T')[0];
@@ -26,7 +33,7 @@ const OrderHistory = () => {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const response = await API.get('/orders '); // Note the trailing slash
+        const response = await API.get('/orders/');
         const allOrders = response.data.orders || [];
         setOrders(allOrders);
         applyViewAndFilters(allOrders, viewMode);
@@ -45,6 +52,44 @@ const OrderHistory = () => {
   useEffect(() => {
     applyViewAndFilters(orders, viewMode);
   }, [filters, orders, viewMode]);
+
+  // Calculate Financial Summary
+  const calculateSummary = (orderList) => {
+    let totalCollection = 0;
+    let foodCollection = 0;
+    let cafeCollection = 0;
+    let refundAmount = 0;
+
+    orderList.forEach(order => {
+      if (order.status === 'paid') {
+        // Calculate category-wise collections
+        order.items.forEach(item => {
+          const itemAmount = item.quantity * parseFloat(item.price);
+          if (item.category === 'cafe') {
+            cafeCollection += itemAmount;
+          } else {
+            foodCollection += itemAmount;
+          }
+        });
+
+        // Add to total collection
+        totalCollection += parseFloat(order.total_amount);
+        
+        // Add refund amount if any
+        refundAmount += parseFloat(order.refunded_amount || 0);
+      }
+    });
+
+    const netCollection = totalCollection - refundAmount;
+
+    setSummary({
+      totalCollection,
+      foodCollection,
+      cafeCollection,
+      refundAmount,
+      netCollection
+    });
+  };
 
   // Filter Logic
   const applyViewAndFilters = (data, mode) => {
@@ -77,6 +122,7 @@ const OrderHistory = () => {
     }
 
     setFilteredOrders(result);
+    calculateSummary(result);
   };
 
   const handleFilterChange = e => {
@@ -100,48 +146,55 @@ const OrderHistory = () => {
     setFilters(prev => ({ ...prev, dateFrom: '', dateTo: '' }));
   };
 
-  // CSV DOWNLOAD – NO REDIRECT
+  // CSV DOWNLOAD
   const handleDownloadCSV = async () => {
-  try {
-    const params = {
-      table_number: filters.tableNumber || undefined,
-      status: filters.status || undefined,
-      payment_mode: filters.paymentMode || undefined,
-      date_from: filters.dateFrom || undefined,
-      date_to: filters.dateTo || undefined,
-      search: filters.search || undefined,
-    };
+    try {
+      const params = {
+        table_number: filters.tableNumber || undefined,
+        status: filters.status || undefined,
+        payment_mode: filters.paymentMode || undefined,
+        date_from: filters.dateFrom || undefined,
+        date_to: filters.dateTo || undefined,
+        search: filters.search || undefined,
+      };
 
-    if (viewMode === 'today') params.today = '1';
-    if (viewMode === 'yesterday') params.yesterday = '1';
+      if (viewMode === 'today') params.today = '1';
+      if (viewMode === 'yesterday') params.yesterday = '1';
 
-    const response = await API.get('/orders/download-csv/', {
-      params,
-      responseType: 'blob',
-      timeout: 60000,
-    });
+      const response = await API.get('/orders/download-csv/', {
+        params,
+        responseType: 'blob',
+        timeout: 60000,
+      });
 
-    // Create download link
-    const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.setAttribute('download', `order_history_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(downloadUrl);
+      const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', `order_history_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
 
-  } catch (err) {
-    console.error('CSV Download Failed:', err);
-    if (err.response?.status === 404) {
-      alert('CSV endpoint not working. Check server logs.');
-    } else if (err.response?.status >= 500) {
-      alert('Server error while generating CSV. Check backend logs.');
-    } else {
-      alert('Failed to download CSV. Please try again.');
+    } catch (err) {
+      console.error('CSV Download Failed:', err);
+      if (err.response?.status === 404) {
+        alert('CSV endpoint not working. Check server logs.');
+      } else if (err.response?.status >= 500) {
+        alert('Server error while generating CSV. Check backend logs.');
+      } else {
+        alert('Failed to download CSV. Please try again.');
+      }
     }
-  }
-};
+  };
+
+  // Format currency
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
 
   if (loading) {
     return (
@@ -202,6 +255,30 @@ const OrderHistory = () => {
         </div>
       </div>
 
+      {/* Financial Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+        <div className="text-center">
+          <div className="text-sm text-gray-600 font-medium">Total Collection</div>
+          <div className="text-lg font-bold text-green-600">₹{formatCurrency(summary.totalCollection)}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-sm text-gray-600 font-medium">Food Collection</div>
+          <div className="text-lg font-bold text-blue-600">₹{formatCurrency(summary.foodCollection)}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-sm text-gray-600 font-medium">Cafe Collection</div>
+          <div className="text-lg font-bold text-purple-600">₹{formatCurrency(summary.cafeCollection)}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-sm text-gray-600 font-medium">Refund Amount</div>
+          <div className="text-lg font-bold text-red-600">₹{formatCurrency(summary.refundAmount)}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-sm text-gray-600 font-medium">Net Collection</div>
+          <div className="text-lg font-bold text-indigo-600">₹{formatCurrency(summary.netCollection)}</div>
+        </div>
+      </div>
+
       {/* View Label */}
       {viewMode !== 'all' && (
         <div className="mb-4 text-sm text-indigo-600 font-medium">
@@ -212,30 +289,63 @@ const OrderHistory = () => {
 
       {/* Filters */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <input type="text" name="search" value={filters.search} onChange={handleFilterChange}
+        <input 
+          type="text" 
+          name="search" 
+          value={filters.search} 
+          onChange={handleFilterChange}
           placeholder="Search by Order ID or Item Name"
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
-        <input type="number" name="tableNumber" value={filters.tableNumber} onChange={handleFilterChange}
+          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" 
+        />
+        <input 
+          type="number" 
+          name="tableNumber" 
+          value={filters.tableNumber} 
+          onChange={handleFilterChange}
           placeholder="Table Number"
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
-        <select name="status" value={filters.status} onChange={handleFilterChange}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" 
+        />
+        <select 
+          name="status" 
+          value={filters.status} 
+          onChange={handleFilterChange}
+          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+        >
           <option value="">All Status</option>
           <option value="pending">Pending</option>
           <option value="paid">Paid</option>
           <option value="cancelled">Cancelled</option>
         </select>
-        <select name="paymentMode" value={filters.paymentMode} onChange={handleFilterChange}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+        <select 
+          name="paymentMode" 
+          value={filters.paymentMode} 
+          onChange={handleFilterChange}
+          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+        >
           <option value="">All Payment Modes</option>
           <option value="cash">Cash</option>
           <option value="card">Card</option>
           <option value="upi">UPI</option>
         </select>
-        <input type="date" name="dateFrom" value={filters.dateFrom} onChange={handleFilterChange}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
-        <input type="date" name="dateTo" value={filters.dateTo} onChange={handleFilterChange}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+        <input 
+          type="date" 
+          name="dateFrom" 
+          value={filters.dateFrom} 
+          onChange={handleFilterChange}
+          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" 
+        />
+        <input 
+          type="date" 
+          name="dateTo" 
+          value={filters.dateTo} 
+          onChange={handleFilterChange}
+          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" 
+        />
+      </div>
+
+      {/* Orders Count */}
+      <div className="mb-4 text-sm text-gray-600">
+        Showing {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
       </div>
 
       {/* Table */}
@@ -249,15 +359,17 @@ const OrderHistory = () => {
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px]">
+          <table className="w-full min-w-[900px]">
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">Order ID</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">Table</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">Seats</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">Items</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">Total</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">Received</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">Balance</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">Refund</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">Payment</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">Status</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">Created</th>
@@ -267,14 +379,35 @@ const OrderHistory = () => {
             <tbody>
               {filteredOrders.map(order => (
                 <tr key={order.order_id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-3 px-4 text-sm">#{order.order_id}</td>
+                  <td className="py-3 px-4 text-sm font-medium">#{order.order_id}</td>
                   <td className="py-3 px-4 text-sm">{order.table_number}</td>
                   <td className="py-3 px-4 text-sm">
-                    {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
+                    {order.selected_seats && order.selected_seats.length > 0 
+                      ? order.selected_seats.join(', ') 
+                      : '-'}
                   </td>
-                  <td className="py-3 px-4 text-sm font-medium">₹{order.total_amount}</td>
-                  <td className="py-3 px-4 text-sm">₹{order.received_amount}</td>
-                  <td className="py-3 px-4 text-sm">₹{order.balance_amount}</td>
+                  <td className="py-3 px-4 text-sm">
+                    <div className="max-w-xs">
+                      {order.items.map((item, index) => (
+                        <div key={index} className="mb-1 last:mb-0">
+                          {item.quantity}x {item.name}
+                          <span className="text-xs text-gray-500 ml-1">
+                            ({item.category})
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="py-3 px-4 text-sm font-medium">₹{formatCurrency(parseFloat(order.total_amount))}</td>
+                  <td className="py-3 px-4 text-sm">₹{formatCurrency(parseFloat(order.received_amount))}</td>
+                  <td className="py-3 px-4 text-sm">₹{formatCurrency(parseFloat(order.balance_amount))}</td>
+                  <td className="py-3 px-4 text-sm">
+                    {order.refunded_amount > 0 ? (
+                      <span className="text-red-600 font-medium">
+                        ₹{formatCurrency(parseFloat(order.refunded_amount))}
+                      </span>
+                    ) : '-'}
+                  </td>
                   <td className="py-3 px-4 text-sm capitalize">{order.payment_mode}</td>
                   <td className="py-3 px-4">
                     <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :

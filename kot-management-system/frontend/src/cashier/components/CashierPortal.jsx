@@ -1,5 +1,5 @@
 // src/components/CashierDashboard.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -18,10 +18,13 @@ import {
   TrendingUp,
   ArrowRight,
   Package,
+  Table,
+  Users as TableUsers,
 } from "lucide-react";
 import API from "../../api";
 
 const API_URL = "cashier-orders/";
+const TABLES_API_URL = "tables/";
 
 // ──────────────────────────────────────
 //  SAFE NUMBER FORMATTER
@@ -44,6 +47,81 @@ const PaymentIcon = ({ mode }) => {
 };
 
 // ──────────────────────────────────────
+//  TABLE STATUS COMPONENT
+// ──────────────────────────────────────
+const TableStatus = ({ tables = [] }) => {
+  const getTableStatusColor = (status) => {
+    switch (status) {
+      case "available": return "bg-green-100 text-green-800 border-green-200";
+      case "occupied": return "bg-orange-100 text-orange-800 border-orange-200";
+      case "reserved": return "bg-blue-100 text-blue-800 border-blue-200";
+      case "cleaning": return "bg-red-100 text-red-800 border-red-200";
+      default: return "bg-gray-100 text-gray-800 border-gray-200";
+    }
+  };
+
+  const getTableStatusIcon = (status) => {
+    switch (status) {
+      case "available": return "🟢";
+      case "occupied": return "🟡";
+      case "reserved": return "🔵";
+      case "cleaning": return "🔴";
+      default: return "⚫";
+    }
+  };
+
+  const statusCounts = tables.reduce((acc, table) => {
+    acc[table.status] = (acc[table.status] || 0) + 1;
+    return acc;
+  }, {});
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200"
+    >
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-emerald-700 rounded-xl flex items-center justify-center text-white shadow-md">
+          <Table size={24} />
+        </div>
+        <div>
+          <h3 className="text-xl font-bold text-gray-900">Table Status</h3>
+          <p className="text-sm text-gray-600">Real-time table occupancy</p>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {Object.entries(statusCounts).map(([status, count]) => (
+          <motion.div
+            key={status}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className={`flex items-center justify-between p-3 rounded-xl border ${getTableStatusColor(status)}`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-lg">{getTableStatusIcon(status)}</span>
+              <span className="font-medium capitalize">{status}</span>
+            </div>
+            <span className="font-bold text-lg">{count}</span>
+          </motion.div>
+        ))}
+      </div>
+
+      {tables.length === 0 && (
+        <div className="text-center py-4 text-gray-500">
+          No table data available
+        </div>
+      )}
+
+      <div className="mt-4 text-xs text-gray-500 text-center">
+        Total Tables: {tables.length}
+      </div>
+    </motion.div>
+  );
+};
+
+// ──────────────────────────────────────
 //  SIDEBAR COMPONENT
 // ──────────────────────────────────────
 const Sidebar = ({ active, setActive, onLogout }) => {
@@ -56,6 +134,12 @@ const Sidebar = ({ active, setActive, onLogout }) => {
       label: "Cashier Dashboard",
       icon: LayoutDashboard,
       path: "/cashier",
+    },
+    {
+      id: "tables",
+      label: "Table Management",
+      icon: Table,
+      path: "/cashier/tablemanage",
     },
     {
       id: "pending",
@@ -79,7 +163,7 @@ const Sidebar = ({ active, setActive, onLogout }) => {
       className="w-72 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 shadow-xl z-50"
     >
       <div className="p-6 border-b border-gray-200">
-        <h1 className="text-3xl font-extrabold text-blue-900 t racking-tight">
+        <h1 className="text-3xl font-extrabold text-blue-900 tracking-tight">
           KOT<span className="text-blue-600">Pro</span>
         </h1>
         <p className="text-gray-600 text-sm mt-1">Cashier Portal</p>
@@ -139,7 +223,7 @@ const Sidebar = ({ active, setActive, onLogout }) => {
 // ──────────────────────────────────────
 //  COLLECTION SUMMARY COMPONENT
 // ──────────────────────────────────────
-const CollectionSummary = ({ today, pendingCount }) => {
+const CollectionSummary = ({ today, pendingCount, tableStats }) => {
   const stats = [
     {
       label: "Total Collection",
@@ -155,6 +239,12 @@ const CollectionSummary = ({ today, pendingCount }) => {
       value: pendingCount,
       color: "orange",
       icon: ShoppingCart,
+    },
+    {
+      label: "Occupied Tables",
+      value: tableStats.occupied || 0,
+      color: "red",
+      icon: TableUsers,
     },
   ];
 
@@ -201,7 +291,7 @@ const CollectionSummary = ({ today, pendingCount }) => {
                   {stat.label}
                 </p>
                 <p className={`text-2xl font-bold text-${stat.color}-700 mt-1`}>
-                  {stat.label === "Pending Orders"
+                  {["Pending Orders", "Occupied Tables"].includes(stat.label)
                     ? stat.value
                     : `₹${safeFixed(stat.value)}`}
                 </p>
@@ -223,7 +313,7 @@ const CollectionSummary = ({ today, pendingCount }) => {
 //  ORDER HISTORY COMPONENT
 // ──────────────────────────────────────
 const OrderHistory = ({ orders = [] }) => {
-  const recentOrders = orders.slice(0, 5); // Show only last 5 orders
+  const recentOrders = orders.slice(0, 5);
 
   return (
     <motion.div
@@ -292,8 +382,16 @@ const OrderHistory = ({ orders = [] }) => {
 // ──────────────────────────────────────
 //  QUICK ACTIONS COMPONENT
 // ──────────────────────────────────────
-const QuickActions = ({ pendingCount, onNavigate }) => {
+const QuickActions = ({ pendingCount, onNavigate, tableStats }) => {
   const actions = [
+    {
+      label: "Table Management",
+      description: "Manage table status and occupancy",
+      count: tableStats.total,
+      icon: Table,
+      color: "green",
+      path: "/cashier/tablemanage",
+    },
     {
       label: "Pending Orders",
       description: "Manage unpaid orders",
@@ -306,14 +404,14 @@ const QuickActions = ({ pendingCount, onNavigate }) => {
       label: "Completed Orders",
       description: "View order history",
       icon: CheckCircle,
-      color: "green",
+      color: "blue",
       path: "/cashier/completed-orders",
     },
     {
       label: "Print Reports",
       description: "Generate daily reports",
       icon: Clock,
-      color: "blue",
+      color: "purple",
       path: "/cashier/reports",
     },
   ];
@@ -326,7 +424,7 @@ const QuickActions = ({ pendingCount, onNavigate }) => {
     >
       <h3 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h3>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {actions.map((action, index) => (
           <motion.button
             key={index}
@@ -376,6 +474,7 @@ const CashierDashboard = () => {
   const [active, setActive] = useState("dashboard");
   const [pendingOrders, setPendingOrders] = useState([]);
   const [completedOrders, setCompletedOrders] = useState([]);
+  const [tables, setTables] = useState([]);
   const [todayCollection, setTodayCollection] = useState({
     total: 0,
     cash: 0,
@@ -386,89 +485,130 @@ const CashierDashboard = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  const fetchData = async () => {
-  try {
-    setError("");
-    const res = await API.get(API_URL);
-    const allOrders = res.data;
+  // Memoized data fetching functions
+  const fetchTables = useCallback(async () => {
+    try {
+      const res = await API.get(TABLES_API_URL);
+      setTables(res.data || []);
+    } catch (err) {
+      console.error("Tables fetch error:", err);
+      // Don't reset tables on error to maintain current state
+    }
+  }, []);
 
-    // Filter pending orders
-    const pending = allOrders.filter((o) => o.status === "pending");
+  const fetchData = useCallback(async () => {
+    try {
+      setError("");
+      const res = await API.get(API_URL);
+      const allOrders = res.data;
 
-    // Get all settled (non-pending) orders
-    const settled = allOrders
-      .filter((o) => o.status !== "pending")
-      .map((order) => {
-        let items = [];
-        if (typeof order.items === "string") {
-          try { items = JSON.parse(order.items); } catch (e) { items = []; }
-        } else if (Array.isArray(order.items)) {
-          items = order.items;
-        } else if (order.items && typeof order.items === "object") {
-          items = Object.values(order.items);
-        }
+      // Filter pending orders
+      const pending = allOrders.filter((o) => o.status === "pending");
 
-        return {
-          ...order,
-          items,
-          refunded_amount: parseFloat(order.refunded_amount || 0),
-          total_amount: parseFloat(order.total_amount || 0),
-        };
+      // Get all settled (non-pending) orders
+      const settled = allOrders
+        .filter((o) => o.status !== "pending")
+        .map((order) => {
+          let items = [];
+          if (typeof order.items === "string") {
+            try { items = JSON.parse(order.items); } catch (e) { items = []; }
+          } else if (Array.isArray(order.items)) {
+            items = order.items;
+          } else if (order.items && typeof order.items === "object") {
+            items = Object.values(order.items);
+          }
+
+          return {
+            ...order,
+            items,
+            refunded_amount: parseFloat(order.refunded_amount || 0),
+            total_amount: parseFloat(order.total_amount || 0),
+          };
+        });
+
+      // Today's date filter
+      const today = new Date().toISOString().split("T")[0];
+      const todaySettled = settled.filter((o) => {
+        const date = (o.paid_at || o.updated_at || o.created_at)?.split("T")[0];
+        return date === today;
       });
 
-    // Today's date filter
-    const today = new Date().toISOString().split("T")[0];
-    const todaySettled = settled.filter((o) => {
-      const date = (o.paid_at || o.updated_at || o.created_at)?.split("T")[0];
-      return date === today;
-    });
+      // Calculate NET collection (after refunds & excluding canceled)
+      const collection = todaySettled.reduce((acc, order) => {
+        // Skip fully canceled orders
+        if (order.status === "canceled" || order.status === "cancelled") {
+          return acc;
+        }
 
-    // Calculate NET collection (after refunds & excluding canceled)
-    const collection = todaySettled.reduce((acc, order) => {
-      // Skip fully canceled orders
-      if (order.status === "canceled" || order.status === "cancelled") {
+        // Net amount = total - refunded
+        const netAmount = order.total_amount - order.refunded_amount;
+
+        // Only include if net amount > 0
+        if (netAmount <= 0) return acc;
+
+        acc.total += netAmount;
+
+        const mode = (order.payment_mode || "cash").toLowerCase();
+        if (["cash", "card", "upi"].includes(mode)) {
+          acc[mode] += netAmount;
+        } else {
+          acc.cash += netAmount; // fallback
+        }
+
         return acc;
-      }
+      }, { total: 0, cash: 0, card: 0, upi: 0 });
 
-      // Net amount = total - refunded
-      const netAmount = order.total_amount - order.refunded_amount;
+      // Update state silently without triggering re-renders unnecessarily
+      setPendingOrders(prev => JSON.stringify(prev) !== JSON.stringify(pending) ? pending : prev);
+      setCompletedOrders(prev => {
+        const filtered = todaySettled.filter(o => 
+          (o.status === "paid" || o.refunded_amount > 0) && 
+          (o.total_amount - o.refunded_amount > 0)
+        );
+        return JSON.stringify(prev) !== JSON.stringify(filtered) ? filtered : prev;
+      });
+      setTodayCollection(prev => JSON.stringify(prev) !== JSON.stringify(collection) ? collection : prev);
 
-      // Only include if net amount > 0
-      if (netAmount <= 0) return acc;
-
-      acc.total += netAmount;
-
-      const mode = (order.payment_mode || "cash").toLowerCase();
-      if (["cash", "card", "upi"].includes(mode)) {
-        acc[mode] += netAmount;
-      } else {
-        acc.cash += netAmount; // fallback
-      }
-
-      return acc;
-    }, { total: 0, cash: 0, card: 0, upi: 0 });
-
-    // Update state
-    setPendingOrders(pending);
-    setCompletedOrders(todaySettled.filter(o => 
-      (o.status === "paid" || o.refunded_amount > 0) && 
-      (o.total_amount - o.refunded_amount > 0)
-    ));
-    setTodayCollection(collection);
-
-  } catch (err) {
-    setError("Failed to load dashboard data");
-    console.error("Dashboard fetch error:", err);
-  } finally {
-    setLoading(false);
-  }
-}; 
-
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 5000); // Auto-refresh every 5 seconds
-    return () => clearInterval(interval);
+    } catch (err) {
+      console.error("Dashboard fetch error:", err);
+      // Don't set error for background updates to avoid UI disruption
+    }
   }, []);
+
+  const loadAllData = useCallback(async () => {
+    if (loading) return; // Don't run if initial load is still in progress
+    
+    try {
+      await Promise.all([fetchData(), fetchTables()]);
+    } catch (err) {
+      console.error("Background data update error:", err);
+    }
+  }, [fetchData, fetchTables, loading]);
+
+  // Initial data load
+  useEffect(() => {
+    const initialLoad = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([fetchData(), fetchTables()]);
+      } catch (err) {
+        setError("Failed to load dashboard data");
+        console.error("Initial load error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    initialLoad();
+  }, [fetchData, fetchTables]);
+
+  // Background data updates - silent refresh every 5 seconds
+  useEffect(() => {
+    if (loading) return; // Don't start background updates until initial load is complete
+    
+    const interval = setInterval(loadAllData, 5000);
+    return () => clearInterval(interval);
+  }, [loadAllData, loading]);
 
   const handleLogout = () => {
     localStorage.clear();
@@ -477,6 +617,15 @@ const CashierDashboard = () => {
 
   const handleNavigate = (path) => {
     navigate(path);
+  };
+
+  // Calculate table statistics
+  const tableStats = {
+    total: tables.length,
+    occupied: tables.filter(t => t.status === "occupied").length,
+    available: tables.filter(t => t.status === "available").length,
+    reserved: tables.filter(t => t.status === "reserved").length,
+    cleaning: tables.filter(t => t.status === "cleaning").length,
   };
 
   if (loading) {
@@ -546,7 +695,7 @@ const CashierDashboard = () => {
                   <p className="text-sm">{error}</p>
                 </div>
                 <button
-                  onClick={fetchData}
+                  onClick={loadAllData}
                   className="ml-auto bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
                 >
                   Retry
@@ -559,18 +708,21 @@ const CashierDashboard = () => {
           <div className="mb-8">
             <QuickActions
               pendingCount={pendingOrders.length}
+              tableStats={tableStats}
               onNavigate={handleNavigate}
             />
           </div>
 
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column - Summary */}
-            <div className="lg:col-span-1">
+            {/* Left Column - Summary & Tables */}
+            <div className="lg:col-span-1 space-y-8">
               <CollectionSummary
                 today={todayCollection}
                 pendingCount={pendingOrders.length}
+                tableStats={tableStats}
               />
+              <TableStatus tables={tables} />
             </div>
 
             {/* Right Column - Recent Orders */}
@@ -606,11 +758,10 @@ const CashierDashboard = () => {
                 <p className="text-gray-600 text-sm">Today's Revenue</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-indigo-700">
-                  {new Date().getHours().toString().padStart(2, "0")}:
-                  {new Date().getMinutes().toString().padStart(2, "0")}
+                <p className="text-2xl font-bold text-orange-700">
+                  {tableStats.occupied}/{tableStats.total}
                 </p>
-                <p className="text-gray-600 text-sm">Current Time</p>
+                <p className="text-gray-600 text-sm">Tables Occupied</p>
               </div>
             </div>
           </motion.div>
