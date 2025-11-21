@@ -7,7 +7,6 @@ import {
   ShoppingCart,
   CheckCircle,
   Users,
-  Settings,
   LogOut,
   IndianRupee,
   Clock,
@@ -18,6 +17,7 @@ import {
   DollarSign,
   TrendingUp,
   ArrowRight,
+  Package,
   Table,
   Users as TableUsers,
 } from "lucide-react";
@@ -153,7 +153,7 @@ const Sidebar = ({ active, setActive, onLogout }) => {
       icon: CheckCircle,
       path: "/cashier/completed-orders",
     },
-    { id: "settings", label: "Settings", icon: Settings },
+    { id: "stocks", label: "Stock Management", icon: Package, path:"/stocks" },
   ];
 
   return (

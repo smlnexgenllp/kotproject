@@ -16,6 +16,7 @@ import CashierWait from "./cashier/pages/CashierWait";
 import PendingOrdersPage from "./cashier/components/PendingOrdersPage";
 import CompletedOrdersPage from "./cashier/components/CompletedOrdersPage";
 import WaiterOrderHistory from "./users/components/WaiterOrderHistory";
+import Stocks from "./cashier/pages/Stocks";
 import TableManage from "./cashier/components/TableManage";
 
 
@@ -126,7 +127,14 @@ function App() {
           </ProtectedRoute>
         }
       />
-
+      <Route
+        path="/stocks"
+        element={
+          <ProtectedRoute allowedRoles={["cashier"]}>
+          <Stocks/>
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/cashier/completed-orders"
         element={
@@ -153,6 +161,7 @@ function App() {
           </ProtectedRoute>
         }
       />
+      
         <Route
         path="/waiter/history"
         element={
