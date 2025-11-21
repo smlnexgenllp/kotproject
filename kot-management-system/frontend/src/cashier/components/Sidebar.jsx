@@ -7,7 +7,8 @@ import {
   ShoppingCart,
   CheckCircle,
   Package,
-  LogOut
+  LogOut,
+  Table
 } from "lucide-react";
 
 const Sidebar = ({ active, onLogout }) => {
@@ -20,6 +21,12 @@ const Sidebar = ({ active, onLogout }) => {
       label: "Cashier Dashboard",
       icon: LayoutDashboard,
       path: "/cashier"
+    },
+    {
+      id:"table",
+      label:"Table Management",
+      icon:Table,
+      path:"/cashier/tablemanage",
     },
     {
       id: "pending",

@@ -20,6 +20,7 @@ import {
   Package,
   Table,
   Users as TableUsers,
+  Package2,
 } from "lucide-react";
 import API from "../../api";
 
@@ -52,21 +53,31 @@ const PaymentIcon = ({ mode }) => {
 const TableStatus = ({ tables = [] }) => {
   const getTableStatusColor = (status) => {
     switch (status) {
-      case "available": return "bg-green-100 text-green-800 border-green-200";
-      case "occupied": return "bg-orange-100 text-orange-800 border-orange-200";
-      case "reserved": return "bg-blue-100 text-blue-800 border-blue-200";
-      case "cleaning": return "bg-red-100 text-red-800 border-red-200";
-      default: return "bg-gray-100 text-gray-800 border-gray-200";
+      case "available":
+        return "bg-green-100 text-green-800 border-green-200";
+      case "occupied":
+        return "bg-orange-100 text-orange-800 border-orange-200";
+      case "reserved":
+        return "bg-blue-100 text-blue-800 border-blue-200";
+      case "cleaning":
+        return "bg-red-100 text-red-800 border-red-200";
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200";
     }
   };
 
   const getTableStatusIcon = (status) => {
     switch (status) {
-      case "available": return "🟢";
-      case "occupied": return "🟡";
-      case "reserved": return "🔵";
-      case "cleaning": return "🔴";
-      default: return "⚫";
+      case "available":
+        return "🟢";
+      case "occupied":
+        return "🟡";
+      case "reserved":
+        return "🔵";
+      case "cleaning":
+        return "🔴";
+      default:
+        return "⚫";
     }
   };
 
@@ -97,7 +108,9 @@ const TableStatus = ({ tables = [] }) => {
             key={status}
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className={`flex items-center justify-between p-3 rounded-xl border ${getTableStatusColor(status)}`}
+            className={`flex items-center justify-between p-3 rounded-xl border ${getTableStatusColor(
+              status
+            )}`}
           >
             <div className="flex items-center gap-3">
               <span className="text-lg">{getTableStatusIcon(status)}</span>
@@ -153,7 +166,12 @@ const Sidebar = ({ active, setActive, onLogout }) => {
       icon: CheckCircle,
       path: "/cashier/completed-orders",
     },
-    { id: "stocks", label: "Stock Management", icon: Package, path:"/stocks" },
+    {
+      id: "stocks",
+      label: "Stocks Management",
+      icon: Package,
+      path: "/stocks",
+    },
   ];
 
   return (
@@ -408,11 +426,11 @@ const QuickActions = ({ pendingCount, onNavigate, tableStats }) => {
       path: "/cashier/completed-orders",
     },
     {
-      label: "Print Reports",
-      description: "Generate daily reports",
-      icon: Clock,
+      label: "Stocks",
+      description: "Stock Management",
+      icon: Package2,
       color: "purple",
-      path: "/cashier/reports",
+      path: "/stocks",
     },
   ];
 
@@ -431,29 +449,43 @@ const QuickActions = ({ pendingCount, onNavigate, tableStats }) => {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => onNavigate(action.path)}
-            className={`bg-gradient-to-br from-${action.color}-50 to-white p-5 rounded-xl border border-${action.color}-200 text-left hover:shadow-md transition-all group`}
+            className={`
+    bg-gradient-to-br from-${action.color}-50 to-white 
+     rounded-xl border border-${action.color}-200 
+    hover:shadow-md transition-all group 
+    flex flex-col justify-between h-full
+  `}
           >
-            <div className="flex items-center justify-between mb-3">
-              <div
-                className={`w-12 h-12 bg-${action.color}-100 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform`}
-              >
-                <action.icon size={24} className={`text-${action.color}-700`} />
-              </div>
-              {action.count !== undefined && (
-                <span
-                  className={`bg-${action.color}-100 text-${action.color}-800 px-2 py-1 rounded-full text-sm font-bold`}
+            {/* TOP CONTENT */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div
+                  className={`w-12 h-12 bg-${action.color}-100 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform`}
                 >
-                  {action.count}
-                </span>
-              )}
+                  <action.icon
+                    size={24}
+                    className={`text-${action.color}-700`}
+                  />
+                </div>
+
+                {action.count !== undefined && (
+                  <span
+                    className={`bg-${action.color}-100 text-${action.color}-800 px-2 py-1 rounded-full text-sm font-bold`}
+                  >
+                    {action.count}
+                  </span>
+                )}
+              </div>
+
+              <h4 className={`font-bold text-${action.color}-900 text-lg mb-2`}>
+                {action.label}
+              </h4>
+
+              <p className="text-gray-600 text-sm">{action.description}</p>
             </div>
 
-            <h4 className={`font-bold text-${action.color}-900 text-lg mb-2`}>
-              {action.label}
-            </h4>
-            <p className="text-gray-600 text-sm mb-3">{action.description}</p>
-
-            <div className="flex items-center text-blue-600 font-medium text-sm">
+            {/* BOTTOM BUTTON */}
+            <div className="flex  justify-end items-center text-blue-600 font-medium text-sm mt-4">
               <span>View Details</span>
               <ArrowRight
                 size={16}
@@ -511,7 +543,11 @@ const CashierDashboard = () => {
         .map((order) => {
           let items = [];
           if (typeof order.items === "string") {
-            try { items = JSON.parse(order.items); } catch (e) { items = []; }
+            try {
+              items = JSON.parse(order.items);
+            } catch (e) {
+              items = [];
+            }
           } else if (Array.isArray(order.items)) {
             items = order.items;
           } else if (order.items && typeof order.items === "object") {
@@ -534,41 +570,50 @@ const CashierDashboard = () => {
       });
 
       // Calculate NET collection (after refunds & excluding canceled)
-      const collection = todaySettled.reduce((acc, order) => {
-        // Skip fully canceled orders
-        if (order.status === "canceled" || order.status === "cancelled") {
+      const collection = todaySettled.reduce(
+        (acc, order) => {
+          // Skip fully canceled orders
+          if (order.status === "canceled" || order.status === "cancelled") {
+            return acc;
+          }
+
+          // Net amount = total - refunded
+          const netAmount = order.total_amount - order.refunded_amount;
+
+          // Only include if net amount > 0
+          if (netAmount <= 0) return acc;
+
+          acc.total += netAmount;
+
+          const mode = (order.payment_mode || "cash").toLowerCase();
+          if (["cash", "card", "upi"].includes(mode)) {
+            acc[mode] += netAmount;
+          } else {
+            acc.cash += netAmount; // fallback
+          }
+
           return acc;
-        }
-
-        // Net amount = total - refunded
-        const netAmount = order.total_amount - order.refunded_amount;
-
-        // Only include if net amount > 0
-        if (netAmount <= 0) return acc;
-
-        acc.total += netAmount;
-
-        const mode = (order.payment_mode || "cash").toLowerCase();
-        if (["cash", "card", "upi"].includes(mode)) {
-          acc[mode] += netAmount;
-        } else {
-          acc.cash += netAmount; // fallback
-        }
-
-        return acc;
-      }, { total: 0, cash: 0, card: 0, upi: 0 });
+        },
+        { total: 0, cash: 0, card: 0, upi: 0 }
+      );
 
       // Update state silently without triggering re-renders unnecessarily
-      setPendingOrders(prev => JSON.stringify(prev) !== JSON.stringify(pending) ? pending : prev);
-      setCompletedOrders(prev => {
-        const filtered = todaySettled.filter(o => 
-          (o.status === "paid" || o.refunded_amount > 0) && 
-          (o.total_amount - o.refunded_amount > 0)
+      setPendingOrders((prev) =>
+        JSON.stringify(prev) !== JSON.stringify(pending) ? pending : prev
+      );
+      setCompletedOrders((prev) => {
+        const filtered = todaySettled.filter(
+          (o) =>
+            (o.status === "paid" || o.refunded_amount > 0) &&
+            o.total_amount - o.refunded_amount > 0
         );
-        return JSON.stringify(prev) !== JSON.stringify(filtered) ? filtered : prev;
+        return JSON.stringify(prev) !== JSON.stringify(filtered)
+          ? filtered
+          : prev;
       });
-      setTodayCollection(prev => JSON.stringify(prev) !== JSON.stringify(collection) ? collection : prev);
-
+      setTodayCollection((prev) =>
+        JSON.stringify(prev) !== JSON.stringify(collection) ? collection : prev
+      );
     } catch (err) {
       console.error("Dashboard fetch error:", err);
       // Don't set error for background updates to avoid UI disruption
@@ -577,7 +622,7 @@ const CashierDashboard = () => {
 
   const loadAllData = useCallback(async () => {
     if (loading) return; // Don't run if initial load is still in progress
-    
+
     try {
       await Promise.all([fetchData(), fetchTables()]);
     } catch (err) {
@@ -598,14 +643,14 @@ const CashierDashboard = () => {
         setLoading(false);
       }
     };
-    
+
     initialLoad();
   }, [fetchData, fetchTables]);
 
   // Background data updates - silent refresh every 5 seconds
   useEffect(() => {
     if (loading) return; // Don't start background updates until initial load is complete
-    
+
     const interval = setInterval(loadAllData, 5000);
     return () => clearInterval(interval);
   }, [loadAllData, loading]);
@@ -622,10 +667,10 @@ const CashierDashboard = () => {
   // Calculate table statistics
   const tableStats = {
     total: tables.length,
-    occupied: tables.filter(t => t.status === "occupied").length,
-    available: tables.filter(t => t.status === "available").length,
-    reserved: tables.filter(t => t.status === "reserved").length,
-    cleaning: tables.filter(t => t.status === "cleaning").length,
+    occupied: tables.filter((t) => t.status === "occupied").length,
+    available: tables.filter((t) => t.status === "available").length,
+    reserved: tables.filter((t) => t.status === "reserved").length,
+    cleaning: tables.filter((t) => t.status === "cleaning").length,
   };
 
   if (loading) {
