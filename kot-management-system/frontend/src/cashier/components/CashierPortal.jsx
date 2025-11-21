@@ -1,5 +1,5 @@
 // src/components/CashierDashboard.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -135,11 +135,11 @@ const Sidebar = ({ active, setActive, onLogout }) => {
       icon: LayoutDashboard,
       path: "/cashier",
     },
-     {
+    {
       id: "tables",
       label: "Table Management",
       icon: Table,
-      path: "/cashier/tablemanage", // Fixed: added leading slash
+      path: "/cashier/tablemanage",
     },
     {
       id: "pending",
@@ -163,7 +163,7 @@ const Sidebar = ({ active, setActive, onLogout }) => {
       className="w-72 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 shadow-xl z-50"
     >
       <div className="p-6 border-b border-gray-200">
-        <h1 className="text-3xl font-extrabold text-blue-900 t racking-tight">
+        <h1 className="text-3xl font-extrabold text-blue-900 tracking-tight">
           KOT<span className="text-blue-600">Pro</span>
         </h1>
         <p className="text-gray-600 text-sm mt-1">Cashier Portal</p>
@@ -313,7 +313,7 @@ const CollectionSummary = ({ today, pendingCount, tableStats }) => {
 //  ORDER HISTORY COMPONENT
 // ──────────────────────────────────────
 const OrderHistory = ({ orders = [] }) => {
-  const recentOrders = orders.slice(0, 5); // Show only last 5 orders
+  const recentOrders = orders.slice(0, 5);
 
   return (
     <motion.div
@@ -384,13 +384,13 @@ const OrderHistory = ({ orders = [] }) => {
 // ──────────────────────────────────────
 const QuickActions = ({ pendingCount, onNavigate, tableStats }) => {
   const actions = [
-   {
+    {
       label: "Table Management",
       description: "Manage table status and occupancy",
       count: tableStats.total,
       icon: Table,
       color: "green",
-      path: "/cashier/tablemanage", // Fixed: changed from /cashier/tables to /cashier/tablemanage
+      path: "/cashier/tablemanage",
     },
     {
       label: "Pending Orders",
@@ -485,105 +485,130 @@ const CashierDashboard = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  const fetchTables = async () => {
+  // Memoized data fetching functions
+  const fetchTables = useCallback(async () => {
     try {
       const res = await API.get(TABLES_API_URL);
       setTables(res.data || []);
     } catch (err) {
       console.error("Tables fetch error:", err);
-      setTables([]);
+      // Don't reset tables on error to maintain current state
     }
-  };
+  }, []);
 
-  const fetchData = async () => {
-  try {
-    setError("");
-    const res = await API.get(API_URL);
-    const allOrders = res.data;
+  const fetchData = useCallback(async () => {
+    try {
+      setError("");
+      const res = await API.get(API_URL);
+      const allOrders = res.data;
 
-    // Filter pending orders
-    const pending = allOrders.filter((o) => o.status === "pending");
+      // Filter pending orders
+      const pending = allOrders.filter((o) => o.status === "pending");
 
-    // Get all settled (non-pending) orders
-    const settled = allOrders
-      .filter((o) => o.status !== "pending")
-      .map((order) => {
-        let items = [];
-        if (typeof order.items === "string") {
-          try { items = JSON.parse(order.items); } catch (e) { items = []; }
-        } else if (Array.isArray(order.items)) {
-          items = order.items;
-        } else if (order.items && typeof order.items === "object") {
-          items = Object.values(order.items);
-        }
+      // Get all settled (non-pending) orders
+      const settled = allOrders
+        .filter((o) => o.status !== "pending")
+        .map((order) => {
+          let items = [];
+          if (typeof order.items === "string") {
+            try { items = JSON.parse(order.items); } catch (e) { items = []; }
+          } else if (Array.isArray(order.items)) {
+            items = order.items;
+          } else if (order.items && typeof order.items === "object") {
+            items = Object.values(order.items);
+          }
 
-        return {
-          ...order,
-          items,
-          refunded_amount: parseFloat(order.refunded_amount || 0),
-          total_amount: parseFloat(order.total_amount || 0),
-        };
+          return {
+            ...order,
+            items,
+            refunded_amount: parseFloat(order.refunded_amount || 0),
+            total_amount: parseFloat(order.total_amount || 0),
+          };
+        });
+
+      // Today's date filter
+      const today = new Date().toISOString().split("T")[0];
+      const todaySettled = settled.filter((o) => {
+        const date = (o.paid_at || o.updated_at || o.created_at)?.split("T")[0];
+        return date === today;
       });
 
-    // Today's date filter
-    const today = new Date().toISOString().split("T")[0];
-    const todaySettled = settled.filter((o) => {
-      const date = (o.paid_at || o.updated_at || o.created_at)?.split("T")[0];
-      return date === today;
-    });
+      // Calculate NET collection (after refunds & excluding canceled)
+      const collection = todaySettled.reduce((acc, order) => {
+        // Skip fully canceled orders
+        if (order.status === "canceled" || order.status === "cancelled") {
+          return acc;
+        }
 
-    // Calculate NET collection (after refunds & excluding canceled)
-    const collection = todaySettled.reduce((acc, order) => {
-      // Skip fully canceled orders
-      if (order.status === "canceled" || order.status === "cancelled") {
+        // Net amount = total - refunded
+        const netAmount = order.total_amount - order.refunded_amount;
+
+        // Only include if net amount > 0
+        if (netAmount <= 0) return acc;
+
+        acc.total += netAmount;
+
+        const mode = (order.payment_mode || "cash").toLowerCase();
+        if (["cash", "card", "upi"].includes(mode)) {
+          acc[mode] += netAmount;
+        } else {
+          acc.cash += netAmount; // fallback
+        }
+
         return acc;
-      }
+      }, { total: 0, cash: 0, card: 0, upi: 0 });
 
-      // Net amount = total - refunded
-      const netAmount = order.total_amount - order.refunded_amount;
+      // Update state silently without triggering re-renders unnecessarily
+      setPendingOrders(prev => JSON.stringify(prev) !== JSON.stringify(pending) ? pending : prev);
+      setCompletedOrders(prev => {
+        const filtered = todaySettled.filter(o => 
+          (o.status === "paid" || o.refunded_amount > 0) && 
+          (o.total_amount - o.refunded_amount > 0)
+        );
+        return JSON.stringify(prev) !== JSON.stringify(filtered) ? filtered : prev;
+      });
+      setTodayCollection(prev => JSON.stringify(prev) !== JSON.stringify(collection) ? collection : prev);
 
-      // Only include if net amount > 0
-      if (netAmount <= 0) return acc;
-
-      acc.total += netAmount;
-
-      const mode = (order.payment_mode || "cash").toLowerCase();
-      if (["cash", "card", "upi"].includes(mode)) {
-        acc[mode] += netAmount;
-      } else {
-        acc.cash += netAmount; // fallback
-      }
-
-      return acc;
-    }, { total: 0, cash: 0, card: 0, upi: 0 });
-
-    // Update state
-    setPendingOrders(pending);
-    setCompletedOrders(todaySettled.filter(o => 
-      (o.status === "paid" || o.refunded_amount > 0) && 
-      (o.total_amount - o.refunded_amount > 0)
-    ));
-    setTodayCollection(collection);
-
-  } catch (err) {
-    setError("Failed to load dashboard data");
-    console.error("Dashboard fetch error:", err);
-  } finally {
-    setLoading(false);
-  }
-}; 
-
-  const loadAllData = async () => {
-    setLoading(true);
-    await Promise.all([fetchData(), fetchTables()]);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    loadAllData();
-    const interval = setInterval(loadAllData, 5000); // Auto-refresh every 5 seconds
-    return () => clearInterval(interval);
+    } catch (err) {
+      console.error("Dashboard fetch error:", err);
+      // Don't set error for background updates to avoid UI disruption
+    }
   }, []);
+
+  const loadAllData = useCallback(async () => {
+    if (loading) return; // Don't run if initial load is still in progress
+    
+    try {
+      await Promise.all([fetchData(), fetchTables()]);
+    } catch (err) {
+      console.error("Background data update error:", err);
+    }
+  }, [fetchData, fetchTables, loading]);
+
+  // Initial data load
+  useEffect(() => {
+    const initialLoad = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([fetchData(), fetchTables()]);
+      } catch (err) {
+        setError("Failed to load dashboard data");
+        console.error("Initial load error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    initialLoad();
+  }, [fetchData, fetchTables]);
+
+  // Background data updates - silent refresh every 5 seconds
+  useEffect(() => {
+    if (loading) return; // Don't start background updates until initial load is complete
+    
+    const interval = setInterval(loadAllData, 5000);
+    return () => clearInterval(interval);
+  }, [loadAllData, loading]);
 
   const handleLogout = () => {
     localStorage.clear();
