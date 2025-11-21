@@ -3,11 +3,12 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  LayoutDashboard,
-  ShoppingCart,
-  CheckCircle,
-  Package,
-  LogOut
+  LayoutDashboard, 
+  ShoppingCart, 
+  CheckCircle, 
+  Package, 
+  LogOut,
+  Table
 } from "lucide-react";
 
 const Sidebar = ({ active, onLogout }) => {
@@ -15,30 +16,11 @@ const Sidebar = ({ active, onLogout }) => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   const menuItems = [
-    {
-      id: "dashboard",
-      label: "Cashier Dashboard",
-      icon: LayoutDashboard,
-      path: "/cashier"
-    },
-    {
-      id: "pending",
-      label: "Pending Orders",
-      icon: ShoppingCart,
-      path: "/cashier/pending-orders"
-    },
-    {
-      id: "completed",
-      label: "Completed Orders",
-      icon: CheckCircle,
-      path: "/cashier/completed-orders"
-    },
-    {
-      id: "stocks",
-      label: "Stocks Management",
-      icon: Package,
-      path: "/stocks"
-    }
+    { id: "dashboard", label: "Cashier Dashboard", icon: LayoutDashboard, path: "/cashier" },
+    { id: "tables", label: "Table Management", icon: Table, path: "/cashier/tablemanage" }, // Fixed: added leading slash
+    { id: "pending", label: "Pending Orders", icon: ShoppingCart, path: "/cashier/pending-orders" },
+    { id: "completed", label: "Completed Orders", icon: CheckCircle, path: "/cashier/completed-orders" },
+    { id: "stocks", label: "stocksmanagement", icon: Package, path: "/stocks" },
   ];
 
   return (
@@ -47,7 +29,6 @@ const Sidebar = ({ active, onLogout }) => {
       animate={{ x: 0 }}
       className="w-72 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 shadow-xl z-50"
     >
-      {/* Header */}
       <div className="p-6 border-b border-gray-200">
         <h1 className="text-3xl font-extrabold text-blue-900 tracking-tight">
           KOT<span className="text-blue-600">Pro</span>
@@ -55,22 +36,18 @@ const Sidebar = ({ active, onLogout }) => {
         <p className="text-gray-600 text-sm mt-1">Cashier Portal</p>
       </div>
 
-      {/* User Info */}
       <div className="p-5 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md">
             {user.username?.[0]?.toUpperCase() || "C"}
           </div>
           <div>
-            <p className="text-gray-900 font-semibold">
-              {user.username || "Cashier"}
-            </p>
+            <p className="text-gray-900 font-semibold">{user.username || "Cashier"}</p>
             <p className="text-blue-700 text-xs font-medium">cashier</p>
           </div>
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="mt-6 px-4">
         {menuItems.map((item) => (
           <motion.button
@@ -90,7 +67,6 @@ const Sidebar = ({ active, onLogout }) => {
         ))}
       </nav>
 
-      {/* Logout */}
       <div className="absolute bottom-0 w-full p-4 border-t border-gray-200">
         <motion.button
           whileHover={{ scale: 1.02 }}
