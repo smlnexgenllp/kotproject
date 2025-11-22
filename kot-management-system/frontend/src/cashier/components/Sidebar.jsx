@@ -1,7 +1,6 @@
 // src/components/Sidebar.jsx
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import {
   LayoutDashboard, 
   ShoppingCart, 
@@ -17,18 +16,14 @@ const Sidebar = ({ active, onLogout }) => {
 
   const menuItems = [
     { id: "dashboard", label: "Cashier Dashboard", icon: LayoutDashboard, path: "/cashier" },
-    { id: "tables", label: "Table Management", icon: Table, path: "/cashier/tablemanage" }, // Fixed: added leading slash
+    { id: "tables", label: "Table Management", icon: Table, path: "/cashier/tablemanage" },
     { id: "pending", label: "Pending Orders", icon: ShoppingCart, path: "/cashier/pending-orders" },
     { id: "completed", label: "Completed Orders", icon: CheckCircle, path: "/cashier/completed-orders" },
-    { id: "stocks", label: "stocksmanagement", icon: Package, path: "/stocks" },
+    { id: "stocks", label: "Stocks Management", icon: Package, path: "/stocks" },
   ];
 
   return (
-    <motion.aside
-      initial={{ x: -320 }}
-      animate={{ x: 0 }}
-      className="w-72 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 shadow-xl z-50"
-    >
+    <aside className="w-72 bg-white border-r border-gray-200 h-screen flex flex-col">
       <div className="p-6 border-b border-gray-200">
         <h1 className="text-3xl font-extrabold text-blue-900 tracking-tight">
           KOT<span className="text-blue-600">Pro</span>
@@ -48,12 +43,10 @@ const Sidebar = ({ active, onLogout }) => {
         </div>
       </div>
 
-      <nav className="mt-6 px-4">
+      <nav className="mt-6 px-4 flex-1">
         {menuItems.map((item) => (
-          <motion.button
+          <button
             key={item.id}
-            whileHover={{ x: 6 }}
-            whileTap={{ scale: 0.95 }}
             onClick={() => navigate(item.path)}
             className={`w-full flex items-center gap-3 px-4 py-4 mb-2 rounded-xl transition-all ${
               active === item.id
@@ -63,22 +56,20 @@ const Sidebar = ({ active, onLogout }) => {
           >
             <item.icon size={22} />
             <span className="font-medium">{item.label}</span>
-          </motion.button>
+          </button>
         ))}
       </nav>
 
-      <div className="absolute bottom-0 w-full p-4 border-t border-gray-200">
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+      <div className="p-4 border-t border-gray-200">
+        <button
           onClick={onLogout}
           className="w-full flex items-center gap-3 px-4 py-4 rounded-xl bg-red-600 text-white hover:bg-red-700 transition"
         >
           <LogOut size={22} />
           <span className="font-medium">Logout</span>
-        </motion.button>
+        </button>
       </div>
-    </motion.aside>
+    </aside>
   );
 };
 
