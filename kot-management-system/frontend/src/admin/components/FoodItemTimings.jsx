@@ -14,7 +14,7 @@ const FoodItemTimings = ({ onMessage }) => {
   const fetchFoodItems = async () => {
     try {
       setLoading(true);
-      const response = await API.get('food-menu/');
+      const response = await API.get('/food-menu');
       setFoodItems(response.data);
     } catch (error) {
       console.error('Failed to fetch food items:', error);
