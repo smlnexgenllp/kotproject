@@ -464,7 +464,7 @@ export default function MenuPage() {
                     </div>
                   </div>
 
-                  <div className="absolute top-1 left-1">
+                  {/* <div className="absolute top-1 left-1">
                     <div
                       className={`w-5 h-5 border-2 rounded-sm flex items-center justify-center ${
                         isVeg
@@ -478,7 +478,7 @@ export default function MenuPage() {
                         }`}
                       />
                     </div>
-                  </div>
+                  </div> */}
                 </div>
 
                 <div className="flex-1 p-2 flex flex-col justify-between min-w-0">

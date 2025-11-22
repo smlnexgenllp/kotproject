@@ -1,5 +1,5 @@
 // src/pages/PaymentPage.jsx
-import React, { useState, useRef } from "react";
+import React, { useState, useRef , useEffect} from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
@@ -15,17 +15,23 @@ import Navbar from "./Navbar.jsx";
 export default function PaymentPage() {
   const navigate = useNavigate();
   const { state } = useLocation();
+   const [user] = useState(JSON.parse(localStorage.getItem("user") || "{}"));
   const { tableNumber, cart, selectedSeats = [], tableId } = state || {};
   const [loading, setLoading] = useState(false);
   const [cashAmount, setCashAmount] = useState("");
   const [showCashInput, setShowCashInput] = useState(false);
+   
+  
+    // Tables state
 
+    const [occupiedTables, setOccupiedTables] = useState([]); // NEW: Occupied tables state
+    
   // ONLINE
   const [showOnlineOptions, setShowOnlineOptions] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState("");
 
   const submittingRef = useRef(false);
-
+  const OCCUPIED_TABLES_API = "http://127.0.0.1:8000/api/tables/occupied-tables/";
   // redirect safety
   if (!cart || !tableNumber) {
     navigate("/");
@@ -33,6 +39,7 @@ export default function PaymentPage() {
   }
 
   const total = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
+   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const received = parseFloat(cashAmount) || 0;
   const balance = received - total;
 
@@ -98,10 +105,56 @@ export default function PaymentPage() {
       submittingRef.current = false;
     }
   };
+  // Fetch Active Tables
+  useEffect(() => {
+    const fetchTables = async () => {
+      try {
+        setTablesLoading(true);
+        const res = await axios.get(TABLES_API);
+        setActiveTables(res.data);
+      } catch (err) {
+        setTablesError("Failed to load tables");
+        console.error(err);
+      } finally {
+        setTablesLoading(false);
+      }
+    };
+    fetchTables();
+  }, []);
 
+  // NEW: Fetch occupied tables
+  const fetchOccupiedTables = async () => {
+    try {
+      const res = await axios.get(OCCUPIED_TABLES_API);
+      setOccupiedTables(res.data);
+    } catch (err) {
+      console.error("Error fetching occupied tables:", err);
+      setOccupiedTables([]);
+    }
+  };
+
+  // Fetch occupied tables on component mount and when seats change
+  useEffect(() => {
+    fetchOccupiedTables();
+  }, []);
+
+  // NEW: Handle occupied table selection
+  const handleOccupiedTableSelect = async (table) => {
+    setTableNumber(table.table_number);
+    await fetchTableSeats(table.table_number);
+    setShowSeatsModal(true);
+  };
   return (
     <>
-      <Navbar />
+        <Navbar
+        user={user}
+        onShowCart={() => setShowCartModal(true)}
+        tableNumber={tableNumber}
+        onShowTable={() => setShowTableModal(true)}
+        selectedSeats={selectedSeats}
+        occupiedTables={occupiedTables} // NEW: Pass occupied tables
+        onOccupiedTableSelect={handleOccupiedTableSelect} // NEW: Pass handler
+      />
       <div className="min-h-screen bg-gradient-to-br from-blue-200 to-indigo-100 flex items-center justify-center p-6">
         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8">
           {/* Table and Seat Information */}
@@ -115,14 +168,6 @@ export default function PaymentPage() {
                 <span>Seats: {selectedSeats.map(s => s.seat_number).join(', ')}</span>
               </div>
             )}
-          </div>
-
-          {/* TOTAL BILL */}
-          <div className="bg-gray-50 rounded-2xl p-6 mb-3">
-            <div className="text-3xl font-bold text-right text-indigo-600">
-              ₹{total}
-            </div>
-            <p className="text-gray-600 text-right">Total Bill</p>
           </div>
 
           {/* CART LIST - FIXED: Show food_id or id */}
@@ -147,7 +192,13 @@ export default function PaymentPage() {
               </div>
             ))}
           </div>
-
+           {/* TOTAL BILL */}
+          <div className="bg-gray-50 rounded-2xl p-6 mb-3">
+            <div className="text-3xl font-bold text-right text-indigo-600">
+              ₹{total}
+            </div>
+            <p className="text-gray-600 text-right">Total Bill</p>
+          </div>
           {/* CASH INPUT */}
           {showCashInput && (
             <div className="mb-6 animate-fadeIn">
@@ -162,7 +213,7 @@ export default function PaymentPage() {
                 className="w-full px-6 py-4 text-2xl font-bold text-center border-4 border-indigo-300 rounded-2xl focus:border-indigo-600 outline-none"
                 autoFocus
               />
-              {cashAmount && (
+              {/* {cashAmount && (
                 <div className="mt-4 text-center">
                   <p className="text-lg text-gray-600">Change to Return:</p>
                   <p
@@ -173,7 +224,7 @@ export default function PaymentPage() {
                     ₹{Math.abs(balance).toFixed(2)}
                   </p>
                 </div>
-              )}
+              )} */}
             </div>
           )}
 
@@ -249,16 +300,57 @@ export default function PaymentPage() {
             )}
 
             {/* PAY CASH */}
-            <button
-              onClick={() => setShowCashInput(true)}
-              disabled={loading || showOnlineOptions}
-              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-5 rounded-2xl flex items-center justify-center gap-3 shadow-lg disabled:opacity-50"
-            >
-              <Wallet size={28} /> Pay Cash
-            </button>
+                       {/* PAY CASH - Shows ONLY when cash input is NOT active */}
+            {!showCashInput && !showOnlineOptions && (
+              <button
+                onClick={() => setShowCashInput(true)}
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-5 rounded-2xl flex items-center justify-center gap-3 shadow-lg disabled:opacity-50 transition-all duration-300"
+              >
+                <Wallet size={28} /> Pay Cash
+              </button>
+            )}
+
+            {/* CASH INPUT MODE - Shows cash input + Confirm + Back */}
+            {showCashInput && (
+              <div className="space-y-4 animate-in fade-in-0 duration-300">
+                {/* CONFIRM PAYMENT BUTTON */}
+                <button
+                  onClick={() => handlePayment("Offline")}
+                  disabled={loading || received < total}
+                  className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-bold py-5 rounded-2xl flex items-center justify-center gap-3 shadow-lg disabled:opacity-50 transition-all duration-300"
+                >
+                  {loading ? (
+                    <Loader2 className="animate-spin" size={28} />
+                  ) : (
+                    <>
+                      <CheckCircle size={28} />
+                      Send to Cashier
+                      {received > total && (
+                        <span className="ml-2 bg-green-600 text-white px-3 py-1 rounded-full text-sm font-bold">
+                          Change: ₹{(received - total).toFixed(0)}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </button>
+
+                {/* BACK BUTTON */}
+                <button
+                  onClick={() => {
+                    setShowCashInput(false);
+                    setCashAmount("");
+                  }}
+                  disabled={loading}
+                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all duration-300 border border-gray-300"
+                >
+                  ← Back
+                </button>
+              </div>
+            )}
 
             {/* CASH CONFIRM */}
-            {showCashInput && (
+            {/* {showCashInput && (
               <button
                 onClick={() => handlePayment("Offline")}
                 disabled={loading || received < total}
@@ -270,7 +362,7 @@ export default function PaymentPage() {
                   "Send to Cashier →"
                 )}
               </button>
-            )}
+            )} */}
           </div>
         </div>
       </div>

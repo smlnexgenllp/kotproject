@@ -3,14 +3,20 @@ import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CheckCircle, IndianRupee, ArrowLeft } from "lucide-react";
 import Navbar from "./Navbar";
+import { useState } from "react";
+import { useRef, useEffect } from "react";
 
 export default function OrderSuccess() {
   const { state } = useLocation();
+  const [user] = useState(JSON.parse(localStorage.getItem("user") || "{}"));
+  const { tableNumber, cart, selectedSeats = [], tableId } = state || {};
+  const [occupiedTables, setOccupiedTables] = useState([]); // NEW: Occupied tables state
+  const OCCUPIED_TABLES_API = "http://127.0.0.1:8000/api/tables/occupied-tables/";
   const navigate = useNavigate();
 
   const {
     orderId = "N/A",
-    tableNumber = "N/A",
+    tableNumbers = "N/A",
     selected_seats = "N/A",
     total = 0,
     mode = "Unknown",
@@ -18,9 +24,56 @@ export default function OrderSuccess() {
     balance = 0,
   } = state || {};
 
+    useEffect(() => {
+      const fetchTables = async () => {
+        try {
+          setTablesLoading(true);
+          const res = await axios.get(TABLES_API);
+          setActiveTables(res.data);
+        } catch (err) {
+          setTablesError("Failed to load tables");
+          console.error(err);
+        } finally {
+          setTablesLoading(false);
+        }
+      };
+      fetchTables();
+    }, []);
+  
+    // NEW: Fetch occupied tables
+    const fetchOccupiedTables = async () => {
+      try {
+        const res = await axios.get(OCCUPIED_TABLES_API);
+        setOccupiedTables(res.data);
+      } catch (err) {
+        console.error("Error fetching occupied tables:", err);
+        setOccupiedTables([]);
+      }
+    };
+  
+    // Fetch occupied tables on component mount and when seats change
+    useEffect(() => {
+      fetchOccupiedTables();
+    }, []);
+  
+    // NEW: Handle occupied table selection
+    const handleOccupiedTableSelect = async (table) => {
+      setTableNumber(table.table_number);
+      await fetchTableSeats(table.table_number);
+      setShowSeatsModal(true);
+    };
+
   return (
     <>
-      <Navbar />
+       <Navbar
+        user={user}
+        onShowCart={() => setShowCartModal(true)}
+        tableNumber={tableNumber}
+        onShowTable={() => setShowTableModal(true)}
+        selectedSeats={selectedSeats}
+        occupiedTables={occupiedTables} // NEW: Pass occupied tables
+        onOccupiedTableSelect={handleOccupiedTableSelect} // NEW: Pass handler
+      />
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full border border-gray-100">
           {/* SUCCESS HEADER */}

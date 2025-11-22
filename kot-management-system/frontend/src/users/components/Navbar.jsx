@@ -35,7 +35,6 @@ const Navbar = ({
   };
 
   const userMenuItems = [
-    { label: "Profile", icon: User, action: () => navigate("/profile") },
     { label: "Order History", icon: History, action: () => navigate("/waiter/history") }, // Now works!
     { label: "Logout", icon: LogOut, action: handleLogout },
   ];
