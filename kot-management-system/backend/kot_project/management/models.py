@@ -202,7 +202,7 @@ class RestaurantTable(models.Model):
                         row_number=row,
                         seat_label=seat_label,
                         is_available=True
-                    )
+                    )             
                     seat_count += 1
 
     def get_available_seats(self):

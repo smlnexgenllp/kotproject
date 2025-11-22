@@ -51,15 +51,15 @@ const TableManage = () => {
       setUpdatingSeat(seatId);
       await API.post(`seats/${seatId}/toggle-availability/`);
 
-      const updatedTables = tables.map(table => {
+      const updatedTables = tables.map((table) => {
         if (table.table_id === selectedTable.table_id) {
           return {
             ...table,
-            seats: table.seats.map(seat =>
+            seats: table.seats.map((seat) =>
               seat.seat_id === seatId
                 ? { ...seat, is_available: !currentStatus }
                 : seat
-            )
+            ),
           };
         }
         return table;
@@ -67,13 +67,13 @@ const TableManage = () => {
 
       setTables(updatedTables);
       if (selectedTable) {
-        setSelectedTable(prev => ({
+        setSelectedTable((prev) => ({
           ...prev,
-          seats: prev.seats.map(seat =>
+          seats: prev.seats.map((seat) =>
             seat.seat_id === seatId
               ? { ...seat, is_available: !currentStatus }
               : seat
-          )
+          ),
         }));
       }
 
@@ -92,7 +92,7 @@ const TableManage = () => {
     const arrangement = [];
     for (let row = 1; row <= rows; row++) {
       const rowSeats = table.seats
-        .filter(seat => seat.row_number === row)
+        .filter((seat) => seat.row_number === row)
         .sort((a, b) => a.seat_number.localeCompare(b.seat_number));
       arrangement.push(rowSeats);
     }
@@ -107,16 +107,18 @@ const TableManage = () => {
   }, [message]);
 
   const getTableStatus = (table) => {
-    if (!table.seats) return { color: 'gray', text: 'No Data', available: 0 };
-    const availableSeats = table.seats.filter(seat => seat.is_available).length;
+    if (!table.seats) return { color: "gray", text: "No Data", available: 0 };
+    const availableSeats = table.seats.filter(
+      (seat) => seat.is_available
+    ).length;
     const totalSeats = table.total_seats;
 
     if (availableSeats === totalSeats) {
-      return { color: 'green', text: 'Available', available: availableSeats };
+      return { color: "green", text: "Available", available: availableSeats };
     } else if (availableSeats === 0) {
-      return { color: 'red', text: 'Full', available: availableSeats };
+      return { color: "red", text: "Full", available: availableSeats };
     } else {
-      return { color: 'orange', text: 'Partial', available: availableSeats };
+      return { color: "orange", text: "Partial", available: availableSeats };
     }
   };
 
@@ -143,7 +145,9 @@ const TableManage = () => {
             >
               <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full"></div>
             </motion.div>
-            <p className="text-blue-900 font-semibold text-lg">Loading Tables...</p>
+            <p className="text-blue-900 font-semibold text-lg">
+              Loading Tables...
+            </p>
           </div>
         </div>
       </CashierLayout>
@@ -358,12 +362,26 @@ const TableManage = () => {
               className="text-center py-16 bg-white rounded-2xl shadow-lg"
             >
               <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                <svg
+                  className="w-12 h-12 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">No Tables Available</h3>
-              <p className="text-gray-600 text-lg">Tables will appear here once they are added to the system.</p>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                No Tables Available
+              </h3>
+              <p className="text-gray-600 text-lg">
+                Tables will appear here once they are added to the system.
+              </p>
             </motion.div>
           ) : (
             <motion.div

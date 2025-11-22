@@ -6,8 +6,9 @@ import SubcategoryTimings from "../../admin/components/SubcategoryTiming";
 import FoodItemTimings from "../../admin/components/FoodItemTimings";
 import StockManagement from "../../admin/components/StockManage";
 import CashierLayout from "../components/CashierLayout";
-
-const TimingManager = () => {
+import { useNavigate } from "react-router-dom";
+const TimingManagers = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("subcategories");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -150,4 +151,4 @@ const TimingManager = () => {
   );
 };
 
-export default TimingManager;
+export default TimingManagers;

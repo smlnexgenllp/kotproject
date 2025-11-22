@@ -8,7 +8,6 @@ import {
   Clock,
   AlertCircle,
   Coffee,
-  DollarSign,
   CreditCard,
   Smartphone,
   X,
@@ -16,6 +15,7 @@ import {
   ChevronUp,
   Search,
   Menu,
+  IndianRupeeIcon
 } from "lucide-react";
 import API from "../../api";
 import CashierLayout from "./CashierLayout";
@@ -29,7 +29,7 @@ const safeFixed = (value) => {
 
 const PaymentIcon = ({ mode }) => {
   const icons = {
-    cash: <DollarSign size={18} className="text-green-700" />,
+    cash: <IndianRupeeIcon size={18} className="text-green-700" />,
     card: <CreditCard size={18} className="text-indigo-700" />,
     upi: <Smartphone size={18} className="text-purple-700" />,
   };

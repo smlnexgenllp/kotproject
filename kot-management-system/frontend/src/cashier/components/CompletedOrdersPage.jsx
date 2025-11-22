@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import {
   Coffee,
   Package,
+  IndianRupeeIcon,
   IndianRupee,
   Download,
   RefreshCw,
@@ -12,7 +13,6 @@ import {
   XCircle,
   AlertCircle,
   CreditCard,
-  DollarSign,
   Smartphone,
   User,
   Undo2,
@@ -27,7 +27,7 @@ const API_URL = "cashier-orders/";
 
 const PaymentIcon = ({ mode }) => {
   const icons = {
-    cash: <DollarSign size={16} className="text-green-600" />,
+    cash: <IndianRupeeIcon size={16} className="text-green-600" />,
     card: <CreditCard size={16} className="text-indigo-600" />,
     upi: <Smartphone size={16} className="text-purple-600" />,
   };
