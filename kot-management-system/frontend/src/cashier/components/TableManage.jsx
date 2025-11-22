@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import API from "../../api";
 import { motion } from "framer-motion";
 import Sidebar from "./Sidebar";
+import { Menu } from "lucide-react";
 
 const TableManage = () => {
   const [tables, setTables] = useState([]);
@@ -12,6 +13,7 @@ const TableManage = () => {
   const [showSeatsModal, setShowSeatsModal] = useState(false);
   const [selectedTable, setSelectedTable] = useState(null);
   const [updatingSeat, setUpdatingSeat] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
   // Fetch all tables
@@ -47,15 +49,15 @@ const TableManage = () => {
       setUpdatingSeat(seatId);
       await API.post(`seats/${seatId}/toggle-availability/`);
 
-      const updatedTables = tables.map(table => {
+      const updatedTables = tables.map((table) => {
         if (table.table_id === selectedTable.table_id) {
           return {
             ...table,
-            seats: table.seats.map(seat =>
+            seats: table.seats.map((seat) =>
               seat.seat_id === seatId
                 ? { ...seat, is_available: !currentStatus }
                 : seat
-            )
+            ),
           };
         }
         return table;
@@ -63,13 +65,13 @@ const TableManage = () => {
 
       setTables(updatedTables);
       if (selectedTable) {
-        setSelectedTable(prev => ({
+        setSelectedTable((prev) => ({
           ...prev,
-          seats: prev.seats.map(seat =>
+          seats: prev.seats.map((seat) =>
             seat.seat_id === seatId
               ? { ...seat, is_available: !currentStatus }
               : seat
-          )
+          ),
         }));
       }
 
@@ -88,7 +90,7 @@ const TableManage = () => {
     const arrangement = [];
     for (let row = 1; row <= rows; row++) {
       const rowSeats = table.seats
-        .filter(seat => seat.row_number === row)
+        .filter((seat) => seat.row_number === row)
         .sort((a, b) => a.seat_number.localeCompare(b.seat_number));
       arrangement.push(rowSeats);
     }
@@ -103,25 +105,51 @@ const TableManage = () => {
   }, [message]);
 
   const getTableStatus = (table) => {
-    if (!table.seats) return { color: 'gray', text: 'No Data', available: 0 };
-    const availableSeats = table.seats.filter(seat => seat.is_available).length;
+    if (!table.seats) return { color: "gray", text: "No Data", available: 0 };
+    const availableSeats = table.seats.filter(
+      (seat) => seat.is_available
+    ).length;
     const totalSeats = table.total_seats;
 
     if (availableSeats === totalSeats) {
-      return { color: 'green', text: 'Available', available: availableSeats };
+      return { color: "green", text: "Available", available: availableSeats };
     } else if (availableSeats === 0) {
-      return { color: 'red', text: 'Full', available: availableSeats };
+      return { color: "red", text: "Full", available: availableSeats };
     } else {
-      return { color: 'orange', text: 'Partial', available: availableSeats };
+      return { color: "orange", text: "Partial", available: availableSeats };
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex">
-        <Sidebar active="tables" onLogout={handleLogout} />
-        <main className="flex-1 ml-72 flex items-center justify-center">
-          <div className="text-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex relative">
+        {/* Mobile Top Bar */}
+        <div className="md:hidden fixed top-0 left-0 right-0 bg-white shadow-md z-30 flex items-center p-4">
+          <button onClick={() => setSidebarOpen(true)} className="p-2">
+            <Menu size={26} />
+          </button>
+          <h1 className="text-xl font-bold ml-4">Table Management</h1>
+        </div>
+
+        {/* Sidebar */}
+        <motion.div
+          initial={{ x: "-100%" }}
+          animate={{ x: sidebarOpen ? 0 : "-100%" }}
+          transition={{ type: "spring", stiffness: 80 }}
+          className="fixed md:static top-0 left-0 h-full w-64 bg-white shadow-lg z-40 md:translate-x-0"
+        >
+          <Sidebar active="tables" onLogout={handleLogout} />
+        </motion.div>
+
+        {/* Overlay when sidebar is open on mobile */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-40 z-30 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          ></div>
+        )}
+        <main className="flex-1 md:ml-64 p-6 md:p-10 mt-14 md:mt-0 transition-all">
+<div className="max-w-7xl mx-auto">
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -129,7 +157,9 @@ const TableManage = () => {
             >
               <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full"></div>
             </motion.div>
-            <p className="text-blue-900 font-semibold text-lg">Loading Tables...</p>
+            <p className="text-blue-900 font-semibold text-lg">
+              Loading Tables...
+            </p>
           </div>
         </main>
       </div>
@@ -180,12 +210,26 @@ const TableManage = () => {
               className="text-center py-16 bg-white rounded-2xl shadow-lg"
             >
               <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                <svg
+                  className="w-12 h-12 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">No Tables Available</h3>
-              <p className="text-gray-600 text-lg">Tables will appear here once they are added to the system.</p>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                No Tables Available
+              </h3>
+              <p className="text-gray-600 text-lg">
+                Tables will appear here once they are added to the system.
+              </p>
             </motion.div>
           ) : (
             <motion.div
@@ -197,13 +241,27 @@ const TableManage = () => {
                 <table className="w-full">
                   <thead className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
                     <tr>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">Table</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold">ID</th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold">Capacity</th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold">Available</th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold">Layout</th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold">Status</th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold">Action</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold">
+                        Table
+                      </th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold">
+                        ID
+                      </th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold">
+                        Capacity
+                      </th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold">
+                        Available
+                      </th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold">
+                        Layout
+                      </th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold">
+                        Status
+                      </th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold">
+                        Action
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -217,23 +275,41 @@ const TableManage = () => {
                           transition={{ delay: index * 0.05 }}
                           className="hover:bg-gray-50 transition-colors"
                         >
-                          <td className="px-6 py-5 font-bold text-gray-900">Table {table.table_number}</td>
-                          <td className="px-6 py-5 text-gray-600">#{table.table_id}</td>
-                          <td className="px-6 py-5 text-center font-medium">{table.total_seats} seats</td>
+                          <td className="px-6 py-5 font-bold text-gray-900">
+                            Table {table.table_number}
+                          </td>
+                          <td className="px-6 py-5 text-gray-600">
+                            #{table.table_id}
+                          </td>
+                          <td className="px-6 py-5 text-center font-medium">
+                            {table.total_seats} seats
+                          </td>
                           <td className="px-6 py-5 text-center font-semibold text-lg">
-                            <span className={
-                              status.color === 'green' ? 'text-green-600' :
-                              status.color === 'red' ? 'text-red-600' : 'text-orange-600'
-                            }>
+                            <span
+                              className={
+                                status.color === "green"
+                                  ? "text-green-600"
+                                  : status.color === "red"
+                                  ? "text-red-600"
+                                  : "text-orange-600"
+                              }
+                            >
                               {status.available}
                             </span>
                           </td>
-                          <td className="px-6 py-5 text-center text-gray-700">{table.seats_per_row} per row</td>
+                          <td className="px-6 py-5 text-center text-gray-700">
+                            {table.seats_per_row} per row
+                          </td>
                           <td className="px-6 py-5 text-center">
-                            <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-sm font-semibold ${
-                              status.color === 'green' ? 'bg-green-100 text-green-800' :
-                              status.color === 'red' ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800'
-                            }`}>
+                            <span
+                              className={`inline-flex items-center px-4 py-1.5 rounded-full text-sm font-semibold ${
+                                status.color === "green"
+                                  ? "bg-green-100 text-green-800"
+                                  : status.color === "red"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-orange-100 text-orange-800"
+                              }`}
+                            >
                               {status.text}
                             </span>
                           </td>
@@ -266,24 +342,38 @@ const TableManage = () => {
             >
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
                 <div>
-                  <p className="text-2xl font-bold text-blue-700">{tables.length}</p>
+                  <p className="text-2xl font-bold text-blue-700">
+                    {tables.length}
+                  </p>
                   <p className="text-gray-600 text-sm">Total Tables</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-green-700">
-                    {tables.filter(table => getTableStatus(table).color === 'green').length}
+                    {
+                      tables.filter(
+                        (table) => getTableStatus(table).color === "green"
+                      ).length
+                    }
                   </p>
                   <p className="text-gray-600 text-sm">Available</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-orange-700">
-                    {tables.filter(table => getTableStatus(table).color === 'orange').length}
+                    {
+                      tables.filter(
+                        (table) => getTableStatus(table).color === "orange"
+                      ).length
+                    }
                   </p>
                   <p className="text-gray-600 text-sm">Partial</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-red-700">
-                    {tables.filter(table => getTableStatus(table).color === 'red').length}
+                    {
+                      tables.filter(
+                        (table) => getTableStatus(table).color === "red"
+                      ).length
+                    }
                   </p>
                   <p className="text-gray-600 text-sm">Full</p>
                 </div>
@@ -305,14 +395,26 @@ const TableManage = () => {
                       <h2 className="text-2xl font-bold">
                         Table {selectedTable.table_number} - Seat Management
                       </h2>
-                      <p className="text-blue-100 mt-1">Click on seats to toggle availability</p>
+                      <p className="text-blue-100 mt-1">
+                        Click on seats to toggle availability
+                      </p>
                     </div>
                     <button
                       onClick={() => setShowSeatsModal(false)}
                       className="text-white hover:text-blue-200 transition p-2 rounded-lg hover:bg-blue-700"
                     >
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <svg
+                        className="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
                       </svg>
                     </button>
                   </div>
@@ -320,60 +422,89 @@ const TableManage = () => {
 
                 <div className="p-6 overflow-auto max-h-[60vh]">
                   <div className="space-y-8">
-                    {getSeatArrangement(selectedTable).map((rowSeats, rowIndex) => (
-                      <div key={rowIndex} className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
-                          Row {rowIndex + 1}
-                        </h3>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                          {rowSeats.map(seat => (
-                            <motion.button
-                              key={seat.seat_id}
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => toggleSeatAvailability(seat.seat_id, seat.is_available)}
-                              disabled={updatingSeat === seat.seat_id}
-                              className={`p-4 rounded-xl border-2 transition-all relative overflow-hidden ${
-                                seat.is_available
-                                  ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-300 text-green-700 hover:from-green-100 hover:to-emerald-100'
-                                  : 'bg-gradient-to-br from-red-50 to-pink-50 border-red-300 text-red-700 hover:from-red-100 hover:to-pink-100'
-                              } ${updatingSeat === seat.seat_id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                              {updatingSeat === seat.seat_id && (
-                                <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center">
-                                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    {getSeatArrangement(selectedTable).map(
+                      (rowSeats, rowIndex) => (
+                        <div key={rowIndex} className="space-y-4">
+                          <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+                            Row {rowIndex + 1}
+                          </h3>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                            {rowSeats.map((seat) => (
+                              <motion.button
+                                key={seat.seat_id}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() =>
+                                  toggleSeatAvailability(
+                                    seat.seat_id,
+                                    seat.is_available
+                                  )
+                                }
+                                disabled={updatingSeat === seat.seat_id}
+                                className={`p-4 rounded-xl border-2 transition-all relative overflow-hidden ${
+                                  seat.is_available
+                                    ? "bg-gradient-to-br from-green-50 to-emerald-50 border-green-300 text-green-700 hover:from-green-100 hover:to-emerald-100"
+                                    : "bg-gradient-to-br from-red-50 to-pink-50 border-red-300 text-red-700 hover:from-red-100 hover:to-pink-100"
+                                } ${
+                                  updatingSeat === seat.seat_id
+                                    ? "opacity-50 cursor-not-allowed"
+                                    : ""
+                                }`}
+                              >
+                                {updatingSeat === seat.seat_id && (
+                                  <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center">
+                                    <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                  </div>
+                                )}
+                                <div className="text-center">
+                                  <div className="text-xl font-bold mb-1">
+                                    {seat.seat_number}
+                                  </div>
+                                  <div
+                                    className={`text-xs font-medium px-2 py-1 rounded-full ${
+                                      seat.is_available
+                                        ? "bg-green-200 text-green-800"
+                                        : "bg-red-200 text-red-800"
+                                    }`}
+                                  >
+                                    {seat.is_available
+                                      ? "Available"
+                                      : "Occupied"}
+                                  </div>
                                 </div>
-                              )}
-                              <div className="text-center">
-                                <div className="text-xl font-bold mb-1">{seat.seat_number}</div>
-                                <div className={`text-xs font-medium px-2 py-1 rounded-full ${
-                                  seat.is_available ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'
-                                }`}>
-                                  {seat.is_available ? 'Available' : 'Occupied'}
-                                </div>
-                              </div>
-                            </motion.button>
-                          ))}
+                              </motion.button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    )}
                   </div>
 
                   <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                       <div>
-                        <p className="text-2xl font-bold text-gray-900">{selectedTable.total_seats}</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {selectedTable.total_seats}
+                        </p>
                         <p className="text-sm text-gray-600">Total Seats</p>
                       </div>
                       <div>
                         <p className="text-2xl font-bold text-green-600">
-                          {selectedTable.seats.filter(seat => seat.is_available).length}
+                          {
+                            selectedTable.seats.filter(
+                              (seat) => seat.is_available
+                            ).length
+                          }
                         </p>
                         <p className="text-sm text-gray-600">Available Seats</p>
                       </div>
                       <div>
                         <p className="text-2xl font-bold text-red-600">
-                          {selectedTable.seats.filter(seat => !seat.is_available).length}
+                          {
+                            selectedTable.seats.filter(
+                              (seat) => !seat.is_available
+                            ).length
+                          }
                         </p>
                         <p className="text-sm text-gray-600">Occupied Seats</p>
                       </div>

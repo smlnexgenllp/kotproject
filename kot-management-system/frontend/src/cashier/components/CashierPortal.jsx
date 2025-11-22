@@ -178,7 +178,7 @@ const Sidebar = ({ active, setActive, onLogout }) => {
     <motion.aside
       initial={{ x: -320 }}
       animate={{ x: 0 }}
-      className="w-72 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 shadow-xl z-50"
+      className="w-72 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 shadow-xl z-50 "
     >
       <div className="p-6 border-b border-gray-200">
         <h1 className="text-3xl font-extrabold text-blue-900 tracking-tight">
@@ -440,7 +440,7 @@ const QuickActions = ({ pendingCount, onNavigate, tableStats }) => {
       animate={{ opacity: 1, y: 0 }}
       className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200"
     >
-      <h3 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h3>
+      <h3 className="text-xl font-bold text-gray-900 ">Quick Actions</h3>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {actions.map((action, index) => (

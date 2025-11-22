@@ -13,12 +13,12 @@ import {
   XCircle,
   AlertCircle,
   CreditCard,
-  DollarSign,
   Smartphone,
   User,
   Undo2,
   ChevronDown,
   ChevronUp,
+  IndianRupeeIcon,
 } from "lucide-react";
 import API from "../../api";
 import Sidebar from "./Sidebar";
@@ -27,7 +27,7 @@ const API_URL = "cashier-orders/";
 
 const PaymentIcon = ({ mode }) => {
   const icons = {
-    cash: <DollarSign size={16} className="text-green-600" />,
+    cash: <IndianRupeeIcon size={16} className="text-green-600" />,
     card: <CreditCard size={16} className="text-indigo-600" />,
     upi: <Smartphone size={16} className="text-purple-600" />,
   };

@@ -33,12 +33,12 @@ const Sidebar = ({ active, onLogout }) => {
         <h1 className="text-3xl font-extrabold text-blue-900 tracking-tight">
           KOT<span className="text-blue-600">Pro</span>
         </h1>
-        <p className="text-gray-600 text-sm mt-1">Cashier Portal</p>
+        <p className="text-gray-600 text-sm ">Cashier Portal</p>
       </div>
 
       <div className="p-5 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md">
+          <div className="w-12 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md">
             {user.username?.[0]?.toUpperCase() || "C"}
           </div>
           <div>
@@ -48,7 +48,7 @@ const Sidebar = ({ active, onLogout }) => {
         </div>
       </div>
 
-      <nav className="mt-6 px-4">
+      <nav className=" px-4">
         {menuItems.map((item) => (
           <motion.button
             key={item.id}

@@ -9,13 +9,13 @@ import {
   Clock,
   AlertCircle,
   Coffee,
-  DollarSign,
   CreditCard,
   Smartphone,
   X,
   ChevronDown,
   ChevronUp,
-  Search, // Added Search icon
+  Search,
+  IndianRupeeIcon, // Added Search icon
 } from "lucide-react";
 import API from "../../api";
 import Sidebar from "./Sidebar";
@@ -29,7 +29,7 @@ const safeFixed = (value) => {
 
 const PaymentIcon = ({ mode }) => {
   const icons = {
-    cash: <DollarSign size={18} className="text-green-700" />,
+    cash: <IndianRupeeIcon size={18} className="text-green-700" />,
     card: <CreditCard size={18} className="text-indigo-700" />,
     upi: <Smartphone size={18} className="text-purple-700" />,
   };
