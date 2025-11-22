@@ -17,6 +17,8 @@ from .serializers import FoodItemSerializer,RestaurantTableSerializer,SubCategor
 from cashier.models import Order, OrderItem
 from django.db.models import Q
 from django.http import HttpResponse
+from datetime import datetime
+from django.core.exceptions import ValidationError
 import csv
 
 logger = logging.getLogger("otp_sender")
@@ -370,20 +372,46 @@ class FoodItemViewSet(viewsets.ModelViewSet):
         POST /api/food-menu/{id}/update_timing/ - Update food item timing
         """
         food_item = self.get_object()
-        start_time = request.data.get('start_time')
-        end_time = request.data.get('end_time')
-        is_timing_active = request.data.get('is_timing_active', False)
-        
-        food_item.start_time = start_time
-        food_item.end_time = end_time
-        food_item.is_timing_active = is_timing_active
-        food_item.save()
-        
-        return Response({
-            'message': f'{food_item.food_name} timing updated successfully',
-            'timing_display': food_item.timing_display,
-            'is_available_now': food_item.is_available_now()
-        })
+    
+        try:
+            start_time_str = request.data.get('start_time')
+            end_time_str = request.data.get('end_time')
+            is_timing_active = request.data.get('is_timing_active', False)
+
+        # Safely parse time strings
+            def parse_time(t):
+                if not t or str(t).strip() in ["", "null", "undefined", "None"]:
+                    return None
+                t = str(t).strip()
+                for fmt in ("%H:%M", "%H:%M:%S"):
+                    try:
+                        return datetime.strptime(t, fmt).time()
+                    except ValueError:
+                        continue
+                raise ValidationError(f"Invalid time format: '{t}'. Use HH:MM")
+
+            start_time = parse_time(start_time_str) if start_time_str else None
+            end_time = parse_time(end_time_str) if end_time_str else None
+
+            if start_time and end_time and start_time >= end_time:
+                return Response({"error": "Start time must be before end time"}, status=400)
+
+            food_item.start_time = start_time
+            food_item.end_time = end_time
+            food_item.is_timing_active = bool(is_timing_active)
+            food_item.save()
+
+            return Response({
+                'message': f'{food_item.food_name} timing updated successfully',
+                'timing_display': food_item.timing_display or "No timing set",
+                'is_available_now': food_item.is_available_now()
+            })
+
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=400)
+        except Exception as e:
+            logger.error(f"FoodItem timing update failed (ID: {pk}): {e}")
+            return Response({"error": "Failed to update timing"}, status=500)
 
     @action(detail=False, methods=['get'])
     def available_items(self, request):
