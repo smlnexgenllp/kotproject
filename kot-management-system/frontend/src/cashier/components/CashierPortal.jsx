@@ -1,13 +1,9 @@
 // src/components/CashierDashboard.jsx
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  LayoutDashboard,
   ShoppingCart,
   CheckCircle,
-  Users,
-  LogOut,
   IndianRupee,
   Clock,
   AlertCircle,
@@ -23,6 +19,7 @@ import {
   Package2,
 } from "lucide-react";
 import API from "../../api";
+import CashierLayout from "./CashierLayout";
 
 const API_URL = "cashier-orders/";
 const TABLES_API_URL = "tables/";
@@ -90,151 +87,47 @@ const TableStatus = ({ tables = [] }) => {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200"
+      className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 border border-gray-200"
     >
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-emerald-700 rounded-xl flex items-center justify-center text-white shadow-md">
-          <Table size={24} />
+      <div className="flex items-center gap-3 mb-4 sm:mb-6">
+        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-green-600 to-emerald-700 rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-md">
+          <Table size={20} className="sm:size-6" />
         </div>
         <div>
-          <h3 className="text-xl font-bold text-gray-900">Table Status</h3>
-          <p className="text-sm text-gray-600">Real-time table occupancy</p>
+          <h3 className="text-lg sm:text-xl font-bold text-gray-900">Table Status</h3>
+          <p className="text-xs sm:text-sm text-gray-600">Real-time table occupancy</p>
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2 sm:space-y-3">
         {Object.entries(statusCounts).map(([status, count]) => (
           <motion.div
             key={status}
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className={`flex items-center justify-between p-3 rounded-xl border ${getTableStatusColor(
+            className={`flex items-center justify-between p-2 sm:p-3 rounded-lg sm:rounded-xl border ${getTableStatusColor(
               status
             )}`}
           >
-            <div className="flex items-center gap-3">
-              <span className="text-lg">{getTableStatusIcon(status)}</span>
-              <span className="font-medium capitalize">{status}</span>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <span className="text-base sm:text-lg">{getTableStatusIcon(status)}</span>
+              <span className="font-medium capitalize text-sm sm:text-base">{status}</span>
             </div>
-            <span className="font-bold text-lg">{count}</span>
+            <span className="font-bold text-base sm:text-lg">{count}</span>
           </motion.div>
         ))}
       </div>
 
       {tables.length === 0 && (
-        <div className="text-center py-4 text-gray-500">
+        <div className="text-center py-3 sm:py-4 text-gray-500 text-sm">
           No table data available
         </div>
       )}
 
-      <div className="mt-4 text-xs text-gray-500 text-center">
+      <div className="mt-3 sm:mt-4 text-xs text-gray-500 text-center">
         Total Tables: {tables.length}
       </div>
     </motion.div>
-  );
-};
-
-// ──────────────────────────────────────
-//  SIDEBAR COMPONENT
-// ──────────────────────────────────────
-const Sidebar = ({ active, setActive, onLogout }) => {
-  const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
-
-  const menuItems = [
-    {
-      id: "dashboard",
-      label: "Cashier Dashboard",
-      icon: LayoutDashboard,
-      path: "/cashier",
-    },
-    {
-      id: "tables",
-      label: "Table Management",
-      icon: Table,
-      path: "/cashier/tablemanage",
-    },
-    {
-      id: "pending",
-      label: "Pending Orders",
-      icon: ShoppingCart,
-      path: "/cashier/pending-orders",
-    },
-    {
-      id: "completed",
-      label: "Completed Orders",
-      icon: CheckCircle,
-      path: "/cashier/completed-orders",
-    },
-    {
-      id: "stocks",
-      label: "Stocks Management",
-      icon: Package,
-      path: "/stocks",
-    },
-  ];
-
-  return (
-    <motion.aside
-      initial={{ x: -320 }}
-      animate={{ x: 0 }}
-      className="w-72 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 shadow-xl z-50 "
-    >
-      <div className="p-6 border-b border-gray-200">
-        <h1 className="text-3xl font-extrabold text-blue-900 tracking-tight">
-          KOT<span className="text-blue-600">Pro</span>
-        </h1>
-        <p className="text-gray-600 text-sm mt-1">Cashier Portal</p>
-      </div>
-
-      <div className="p-5 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md">
-            {user.username?.[0]?.toUpperCase() || "C"}
-          </div>
-          <div>
-            <p className="text-gray-900 font-semibold">
-              {user.username || "Cashier"}
-            </p>
-            <p className="text-blue-700 text-xs font-medium">cashier</p>
-          </div>
-        </div>
-      </div>
-
-      <nav className="mt-6 px-4">
-        {menuItems.map((item) => (
-          <motion.button
-            key={item.id}
-            whileHover={{ x: 6 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => {
-              setActive(item.id);
-              if (item.path) navigate(item.path);
-            }}
-            className={`w-full flex items-center gap-3 px-4 py-4 mb-2 rounded-xl transition-all ${
-              active === item.id
-                ? "bg-blue-700 text-white shadow-lg"
-                : "text-gray-700 hover:bg-gray-100"
-            }`}
-          >
-            <item.icon size={22} />
-            <span className="font-medium">{item.label}</span>
-          </motion.button>
-        ))}
-      </nav>
-
-      <div className="absolute bottom-0 w-full p-4 border-t border-gray-200">
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={onLogout}
-          className="w-full flex items-center gap-3 px-4 py-4 rounded-xl bg-red-600 text-white hover:bg-red-700 transition"
-        >
-          <LogOut size={22} />
-          <span className="font-medium">Logout</span>
-        </motion.button>
-      </div>
-    </motion.aside>
   );
 };
 
@@ -266,19 +159,31 @@ const CollectionSummary = ({ today, pendingCount, tableStats }) => {
     },
   ];
 
+  const getColorClass = (color) => {
+    const colorMap = {
+      blue: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200' },
+      green: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200' },
+      indigo: { bg: 'bg-indigo-100', text: 'text-indigo-700', border: 'border-indigo-200' },
+      purple: { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200' },
+      orange: { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200' },
+      red: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200' },
+    };
+    return colorMap[color] || colorMap.blue;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200"
+      className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 border border-gray-200"
     >
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center text-white shadow-md">
-          <IndianRupee size={24} />
+      <div className="flex items-center gap-3 mb-4 sm:mb-6">
+        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-md">
+          <IndianRupee size={20} className="sm:size-6" />
         </div>
         <div>
-          <h3 className="text-xl font-bold text-gray-900">Today's Summary</h3>
-          <p className="text-sm text-gray-600">
+          <h3 className="text-lg sm:text-xl font-bold text-gray-900">Today's Summary</h3>
+          <p className="text-xs sm:text-sm text-gray-600">
             {new Date().toLocaleDateString("en-IN", {
               weekday: "long",
               year: "numeric",
@@ -289,39 +194,40 @@ const CollectionSummary = ({ today, pendingCount, tableStats }) => {
         </div>
       </div>
 
-      <div className="space-y-4">
-        {stats.map((stat, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: i * 0.1 }}
-            className={`bg-gradient-to-br from-${stat.color}-50 to-white p-4 rounded-xl border border-${stat.color}-200 flex items-center justify-between`}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-10 h-10 bg-${stat.color}-100 rounded-lg flex items-center justify-center`}
-              >
-                <stat.icon size={20} className={`text-${stat.color}-700`} />
+      <div className="space-y-3 sm:space-y-4">
+        {stats.map((stat, i) => {
+          const colorClass = getColorClass(stat.color);
+          return (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: i * 0.1 }}
+              className={`bg-gradient-to-br from-${stat.color}-50 to-white p-3 sm:p-4 rounded-lg sm:rounded-xl border ${colorClass.border} flex items-center justify-between`}
+            >
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 ${colorClass.bg} rounded-lg flex items-center justify-center`}>
+                  <stat.icon size={16} className={`${colorClass.text} sm:size-5`} />
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm text-gray-600 font-medium">
+                    {stat.label}
+                  </p>
+                  <p className={`text-lg sm:text-xl font-bold ${colorClass.text} mt-1`}>
+                    {["Pending Orders", "Occupied Tables"].includes(stat.label)
+                      ? stat.value
+                      : `₹${safeFixed(stat.value)}`}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-gray-600 font-medium">
-                  {stat.label}
-                </p>
-                <p className={`text-2xl font-bold text-${stat.color}-700 mt-1`}>
-                  {["Pending Orders", "Occupied Tables"].includes(stat.label)
-                    ? stat.value
-                    : `₹${safeFixed(stat.value)}`}
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
       </div>
 
-      <div className="mt-6 flex items-center justify-center gap-2 text-green-600 bg-green-50 py-3 rounded-xl border border-green-200">
-        <TrendingUp size={20} />
-        <span className="text-sm font-medium">Real-time updates</span>
+      <div className="mt-4 sm:mt-6 flex items-center justify-center gap-2 text-green-600 bg-green-50 py-2 sm:py-3 rounded-lg sm:rounded-xl border border-green-200 text-xs sm:text-sm">
+        <TrendingUp size={16} className="sm:size-5" />
+        <span className="font-medium">Real-time updates</span>
       </div>
     </motion.div>
   );
@@ -337,22 +243,22 @@ const OrderHistory = ({ orders = [] }) => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200 h-full"
+      className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 border border-gray-200 h-full"
     >
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-bold text-gray-900">Recent Orders</h3>
-        <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
+        <h3 className="text-lg sm:text-xl font-bold text-gray-900">Recent Orders</h3>
+        <span className="bg-blue-100 text-blue-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium">
           {orders.length} total
         </span>
       </div>
 
       {recentOrders.length === 0 ? (
-        <div className="text-center py-8">
-          <CheckCircle size={48} className="mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-500">No completed orders today</p>
+        <div className="text-center py-6 sm:py-8">
+          <CheckCircle size={40} className="mx-auto text-gray-400 mb-3 sm:mb-4 sm:size-12" />
+          <p className="text-gray-500 text-sm sm:text-base">No completed orders today</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {recentOrders.map((order, i) => {
             const amount = parseFloat(order.total_amount) || 0;
             return (
@@ -361,18 +267,18 @@ const OrderHistory = ({ orders = [] }) => {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.05 }}
-                className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200 hover:bg-gray-100 transition-colors"
+                className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 rounded-lg sm:rounded-xl border border-gray-200 hover:bg-gray-100 transition-colors"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   <PaymentIcon mode={order.payment_mode} />
                   <div>
-                    <p className="font-semibold text-gray-800">
-                      Table {order.table_number}: {order.selected_seats}
-                      <span className="text-gray-600 ml-2">
+                    <p className="font-semibold text-gray-800 text-sm sm:text-base">
+                      Table {order.table_number}
+                      <span className="text-gray-600 ml-1 sm:ml-2 text-xs sm:text-sm">
                         #{order.order_id}
                       </span>
                     </p>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-xs text-gray-600">
                       {order.paid_at
                         ? new Date(order.paid_at).toLocaleTimeString()
                         : "—"}
@@ -380,8 +286,8 @@ const OrderHistory = ({ orders = [] }) => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-green-700 flex items-center justify-end gap-1">
-                    <IndianRupee size={16} />
+                  <p className="font-bold text-green-700 flex items-center justify-end gap-1 text-sm sm:text-base">
+                    <IndianRupee size={14} className="sm:size-4" />
                     {amount.toFixed(2)}
                   </p>
                   <p className="text-xs text-gray-600 capitalize mt-1">
@@ -434,66 +340,67 @@ const QuickActions = ({ pendingCount, onNavigate, tableStats }) => {
     },
   ];
 
+  const getColorClass = (color) => {
+    const colorMap = {
+      green: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200' },
+      orange: { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200' },
+      blue: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200' },
+      purple: { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200' },
+    };
+    return colorMap[color] || colorMap.blue;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200"
+      className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 border border-gray-200"
     >
-      <h3 className="text-xl font-bold text-gray-900 ">Quick Actions</h3>
+      <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6">Quick Actions</h3>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {actions.map((action, index) => (
-          <motion.button
-            key={index}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => onNavigate(action.path)}
-            className={`
-    bg-gradient-to-br from-${action.color}-50 to-white 
-     rounded-xl border border-${action.color}-200 
-    hover:shadow-md transition-all group 
-    flex flex-col justify-between h-full
-  `}
-          >
-            {/* TOP CONTENT */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <div
-                  className={`w-12 h-12 bg-${action.color}-100 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform`}
-                >
-                  <action.icon
-                    size={24}
-                    className={`text-${action.color}-700`}
-                  />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {actions.map((action, index) => {
+          const colorClass = getColorClass(action.color);
+          return (
+            <motion.button
+              key={index}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => onNavigate(action.path)}
+              className={`bg-gradient-to-br from-${action.color}-50 to-white rounded-lg sm:rounded-xl border ${colorClass.border} hover:shadow-md transition-all group flex flex-col justify-between h-full p-3 sm:p-4`}
+            >
+              {/* TOP CONTENT */}
+              <div>
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <div className={`w-8 h-8 sm:w-10 sm:h-10 ${colorClass.bg} rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                    <action.icon size={18} className={`${colorClass.text} sm:size-5`} />
+                  </div>
+
+                  {action.count !== undefined && (
+                    <span className={`${colorClass.bg} ${colorClass.text} px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-bold`}>
+                      {action.count}
+                    </span>
+                  )}
                 </div>
 
-                {action.count !== undefined && (
-                  <span
-                    className={`bg-${action.color}-100 text-${action.color}-800 px-2 py-1 rounded-full text-sm font-bold`}
-                  >
-                    {action.count}
-                  </span>
-                )}
+                <h4 className={`font-bold ${colorClass.text} text-base sm:text-lg mb-1 sm:mb-2`}>
+                  {action.label}
+                </h4>
+
+                <p className="text-gray-600 text-xs sm:text-sm">{action.description}</p>
               </div>
 
-              <h4 className={`font-bold text-${action.color}-900 text-lg mb-2`}>
-                {action.label}
-              </h4>
-
-              <p className="text-gray-600 text-sm">{action.description}</p>
-            </div>
-
-            {/* BOTTOM BUTTON */}
-            <div className="flex  justify-end items-center text-blue-600 font-medium text-sm mt-4">
-              <span>View Details</span>
-              <ArrowRight
-                size={16}
-                className="ml-1 group-hover:translate-x-1 transition-transform"
-              />
-            </div>
-          </motion.button>
-        ))}
+              {/* BOTTOM BUTTON */}
+              <div className="flex justify-end items-center text-blue-600 font-medium text-xs sm:text-sm mt-2 sm:mt-3">
+                <span>View Details</span>
+                <ArrowRight
+                  size={14}
+                  className="ml-1 group-hover:translate-x-1 transition-transform sm:size-4"
+                />
+              </div>
+            </motion.button>
+          );
+        })}
       </div>
     </motion.div>
   );
@@ -503,7 +410,6 @@ const QuickActions = ({ pendingCount, onNavigate, tableStats }) => {
 //  MAIN DASHBOARD COMPONENT
 // ──────────────────────────────────────
 const CashierDashboard = () => {
-  const [active, setActive] = useState("dashboard");
   const [pendingOrders, setPendingOrders] = useState([]);
   const [completedOrders, setCompletedOrders] = useState([]);
   const [tables, setTables] = useState([]);
@@ -515,7 +421,6 @@ const CashierDashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
 
   // Memoized data fetching functions
   const fetchTables = useCallback(async () => {
@@ -524,7 +429,6 @@ const CashierDashboard = () => {
       setTables(res.data || []);
     } catch (err) {
       console.error("Tables fetch error:", err);
-      // Don't reset tables on error to maintain current state
     }
   }, []);
 
@@ -597,31 +501,22 @@ const CashierDashboard = () => {
         { total: 0, cash: 0, card: 0, upi: 0 }
       );
 
-      // Update state silently without triggering re-renders unnecessarily
-      setPendingOrders((prev) =>
-        JSON.stringify(prev) !== JSON.stringify(pending) ? pending : prev
-      );
-      setCompletedOrders((prev) => {
-        const filtered = todaySettled.filter(
-          (o) =>
-            (o.status === "paid" || o.refunded_amount > 0) &&
-            o.total_amount - o.refunded_amount > 0
-        );
-        return JSON.stringify(prev) !== JSON.stringify(filtered)
-          ? filtered
-          : prev;
-      });
-      setTodayCollection((prev) =>
-        JSON.stringify(prev) !== JSON.stringify(collection) ? collection : prev
-      );
+      // Update state
+      setPendingOrders(pending);
+      setCompletedOrders(todaySettled.filter(
+        (o) =>
+          (o.status === "paid" || o.refunded_amount > 0) &&
+          o.total_amount - o.refunded_amount > 0
+      ));
+      setTodayCollection(collection);
     } catch (err) {
       console.error("Dashboard fetch error:", err);
-      // Don't set error for background updates to avoid UI disruption
+      setError("Failed to load dashboard data");
     }
   }, []);
 
   const loadAllData = useCallback(async () => {
-    if (loading) return; // Don't run if initial load is still in progress
+    if (loading) return;
 
     try {
       await Promise.all([fetchData(), fetchTables()]);
@@ -649,19 +544,14 @@ const CashierDashboard = () => {
 
   // Background data updates - silent refresh every 5 seconds
   useEffect(() => {
-    if (loading) return; // Don't start background updates until initial load is complete
+    if (loading) return;
 
     const interval = setInterval(loadAllData, 5000);
     return () => clearInterval(interval);
   }, [loadAllData, loading]);
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate("/");
-  };
-
   const handleNavigate = (path) => {
-    navigate(path);
+    window.location.href = path;
   };
 
   // Calculate table statistics
@@ -675,144 +565,132 @@ const CashierDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
-        <div className="text-center">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            className="mx-auto mb-4"
-          >
-            <Coffee className="text-blue-700" size={64} />
-          </motion.div>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-blue-900 font-semibold text-lg"
-          >
-            Loading Dashboard...
-          </motion.p>
+      <CashierLayout activePage="dashboard">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              className="mx-auto mb-4"
+            >
+              <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+            </motion.div>
+            <p className="text-blue-900 font-semibold text-lg">Loading Dashboard...</p>
+          </div>
         </div>
-      </div>
+      </CashierLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex">
-      <Sidebar active={active} setActive={setActive} onLogout={handleLogout} />
-
-      <main className="flex-1 ml-72 p-6 md:p-10">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-7xl mx-auto"
-        >
-          {/* Header */}
-          <div className="mb-10">
-            <motion.h1
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-5xl font-extrabold text-blue-900 mb-3"
-            >
-              Cashier Dashboard
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.1 }}
-              className="text-gray-700 text-lg"
-            >
-              Real-time overview of orders, payments, and restaurant operations
-            </motion.p>
-          </div>
-
-          {/* Error Alert */}
-          <AnimatePresence>
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="mb-8 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 flex items-center gap-3"
-              >
-                <AlertCircle size={24} />
-                <div>
-                  <p className="font-semibold">Connection Error</p>
-                  <p className="text-sm">{error}</p>
-                </div>
-                <button
-                  onClick={loadAllData}
-                  className="ml-auto bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
-                >
-                  Retry
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Quick Actions */}
-          <div className="mb-8">
-            <QuickActions
-              pendingCount={pendingOrders.length}
-              tableStats={tableStats}
-              onNavigate={handleNavigate}
-            />
-          </div>
-
-          {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column - Summary & Tables */}
-            <div className="lg:col-span-1 space-y-8">
-              <CollectionSummary
-                today={todayCollection}
-                pendingCount={pendingOrders.length}
-                tableStats={tableStats}
-              />
-              <TableStatus tables={tables} />
-            </div>
-
-            {/* Right Column - Recent Orders */}
-            <div className="lg:col-span-2">
-              <OrderHistory orders={completedOrders} />
-            </div>
-          </div>
-
-          {/* Stats Footer */}
-          <motion.div
+    <CashierLayout activePage="dashboard">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
+        {/* Header */}
+        <div className="mb-6 sm:mb-8">
+          <motion.h1
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-2 sm:mb-3"
+          >
+            Cashier Dashboard
+          </motion.h1>
+          <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="mt-12 bg-white rounded-2xl shadow-lg p-6 border border-gray-200"
+            transition={{ delay: 0.1 }}
+            className="text-sm sm:text-base text-gray-700"
           >
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-center">
-              <div>
-                <p className="text-2xl font-bold text-blue-700">
-                  {pendingOrders.length}
-                </p>
-                <p className="text-gray-600 text-sm">Pending Orders</p>
+            Real-time overview of orders, payments, and restaurant operations
+          </motion.p>
+        </div>
+
+        {/* Error Alert */}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg sm:rounded-xl text-red-700 flex items-center gap-2 sm:gap-3 text-sm sm:text-base"
+            >
+              <AlertCircle size={20} className="sm:size-6" />
+              <div className="flex-1">
+                <p className="font-semibold">Connection Error</p>
+                <p className="text-xs sm:text-sm">{error}</p>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-green-700">
-                  {completedOrders.length}
-                </p>
-                <p className="text-gray-600 text-sm">Completed Today</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-purple-700">
-                  ₹{safeFixed(todayCollection.total)}
-                </p>
-                <p className="text-gray-600 text-sm">Today's Revenue</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-orange-700">
-                  {tableStats.occupied}/{tableStats.total}
-                </p>
-                <p className="text-gray-600 text-sm">Tables Occupied</p>
-              </div>
+              <button
+                onClick={loadAllData}
+                className="bg-red-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium hover:bg-red-700 transition-colors"
+              >
+                Retry
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Quick Actions */}
+        <div className="mb-6 sm:mb-8">
+          <QuickActions
+            pendingCount={pendingOrders.length}
+            tableStats={tableStats}
+            onNavigate={handleNavigate}
+          />
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+          {/* Left Column - Summary & Tables */}
+          <div className="lg:col-span-1 space-y-4 sm:space-y-6 lg:space-y-8">
+            <CollectionSummary
+              today={todayCollection}
+              pendingCount={pendingOrders.length}
+              tableStats={tableStats}
+            />
+            <TableStatus tables={tables} />
+          </div>
+
+          {/* Right Column - Recent Orders */}
+          <div className="lg:col-span-2">
+            <OrderHistory orders={completedOrders} />
+          </div>
+        </div>
+
+        {/* Stats Footer */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="mt-6 sm:mt-8 bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 border border-gray-200"
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 text-center">
+            <div>
+              <p className="text-xl sm:text-2xl font-bold text-blue-700">
+                {pendingOrders.length}
+              </p>
+              <p className="text-gray-600 text-xs sm:text-sm">Pending Orders</p>
             </div>
-          </motion.div>
+            <div>
+              <p className="text-xl sm:text-2xl font-bold text-green-700">
+                {completedOrders.length}
+              </p>
+              <p className="text-gray-600 text-xs sm:text-sm">Completed Today</p>
+            </div>
+            <div>
+              <p className="text-xl sm:text-2xl font-bold text-purple-700">
+                ₹{safeFixed(todayCollection.total)}
+              </p>
+              <p className="text-gray-600 text-xs sm:text-sm">Today's Revenue</p>
+            </div>
+            <div>
+              <p className="text-xl sm:text-2xl font-bold text-orange-700">
+                {tableStats.occupied}/{tableStats.total}
+              </p>
+              <p className="text-gray-600 text-xs sm:text-sm">Tables Occupied</p>
+            </div>
+          </div>
         </motion.div>
-      </main>
-    </div>
+      </div>
+    </CashierLayout>
   );
 };
 

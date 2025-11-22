@@ -1,6 +1,5 @@
 // src/components/PendingOrdersPage.jsx
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -15,10 +14,11 @@ import {
   ChevronDown,
   ChevronUp,
   Search,
-  IndianRupeeIcon, // Added Search icon
+  Menu,
+  IndianRupeeIcon
 } from "lucide-react";
 import API from "../../api";
-import Sidebar from "./Sidebar";
+import CashierLayout from "./CashierLayout";
 
 const API_URL = "/cashier-orders/";
 
@@ -55,34 +55,36 @@ const PendingOrderCard = ({ order, onPaid, onPrint, onCancel }) => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.9 }}
       whileHover={{ scale: 1.02 }}
-      className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200"
+      className="bg-white rounded-xl sm:rounded-2xl shadow-lg overflow-hidden border border-gray-200"
     >
       {/* Compact Header */}
-      <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white p-4">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 p-2 rounded-lg">
+      <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white p-3 sm:p-4">
+        <div className="flex justify-between items-start sm:items-center gap-2">
+          <div className="flex items-start sm:items-center gap-2 sm:gap-3 flex-1 min-w-0">
+            <div className="bg-white/20 p-1.5 sm:p-2 rounded-lg flex-shrink-0">
               <PaymentIcon mode={order.payment_mode} />
             </div>
-            <div>
-              <h3 className="text-xl font-bold">Table {order.table_number}</h3>
-               <p className="text-sm">Seats:{order.selected_seats}</p>
-              <p className="text-blue-100 text-sm">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-lg sm:text-xl font-bold truncate">
+                  Table {order.table_number}
+                </h3>
+                <span className="bg-white/25 px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0">
+                  ₹{safeFixed(order.total_amount)}
+                </span>
+              </div>
+              <p className="text-blue-100 text-xs sm:text-sm truncate">
                 #{order.order_id} • {new Date(order.created_at).toLocaleTimeString()}
               </p>
+              <p className="text-blue-200 text-xs mt-1">Seats: {order.selected_seats}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="bg-white/25 px-3 py-1 rounded-full text-sm font-semibold">
-              ₹{safeFixed(order.total_amount)}
-            </span>
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="p-1 hover:bg-white/20 rounded-lg transition-colors"
-            >
-              {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-            </button>
-          </div>
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="p-1 hover:bg-white/20 rounded-lg transition-colors flex-shrink-0"
+          >
+            {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </button>
         </div>
       </div>
 
@@ -96,11 +98,11 @@ const PendingOrderCard = ({ order, onPaid, onPrint, onCancel }) => {
             className="overflow-hidden"
           >
             {/* Items */}
-            <div className="p-4 space-y-2 max-h-48 overflow-y-auto border-b border-gray-100">
+            <div className="p-3 sm:p-4 space-y-2 max-h-48 overflow-y-auto border-b border-gray-100">
               {order.items.map((item, i) => (
                 <div
                   key={i}
-                  className="flex justify-between text-gray-800 font-medium text-sm"
+                  className="flex justify-between text-gray-800 font-medium text-xs sm:text-sm"
                 >
                   <span className="flex-1 truncate mr-2">
                     {item.quantity} × {item.name}
@@ -113,18 +115,18 @@ const PendingOrderCard = ({ order, onPaid, onPrint, onCancel }) => {
             </div>
 
             {/* Payment Summary */}
-            <div className="p-4 bg-gray-50">
-              <div className="bg-white rounded-xl p-3 border border-gray-200 space-y-2">
-                <div className="flex justify-between text-lg font-bold">
+            <div className="p-3 sm:p-4 bg-gray-50">
+              <div className="bg-white rounded-lg sm:rounded-xl p-3 border border-gray-200 space-y-2">
+                <div className="flex justify-between text-base sm:text-lg font-bold">
                   <span>Total</span>
                   <span className="text-blue-700">₹{safeFixed(order.total_amount)}</span>
                 </div>
-                <div className="flex justify-between text-green-700 font-semibold">
+                <div className="flex justify-between text-green-700 font-semibold text-sm sm:text-base">
                   <span>Received</span>
                   <span>₹{safeFixed(order.received_amount)}</span>
                 </div>
                 {parseFloat(order.balance_amount) > 0 && (
-                  <div className="flex justify-between text-orange-700 font-semibold">
+                  <div className="flex justify-between text-orange-700 font-semibold text-sm sm:text-base">
                     <span>Change</span>
                     <span>₹{safeFixed(order.balance_amount)}</span>
                   </div>
@@ -136,25 +138,26 @@ const PendingOrderCard = ({ order, onPaid, onPrint, onCancel }) => {
       </AnimatePresence>
 
       {/* Actions */}
-      <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 flex gap-2">
+      <div className="p-3 sm:p-4 bg-gradient-to-r from-gray-50 to-gray-100 flex gap-2">
         <motion.button
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => onPaid(order.order_id)}
-          className="flex-1 bg-gradient-to-r from-green-600 to-emerald-700 text-white py-3 rounded-xl font-bold text-sm shadow-md flex items-center justify-center gap-2"
+          className="flex-1 bg-gradient-to-r from-green-600 to-emerald-700 text-white py-2 sm:py-3 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm shadow-md flex items-center justify-center gap-1 sm:gap-2"
         >
-          <CheckCircle size={18} />
-          Mark Paid
+          <CheckCircle size={16} className="sm:size-[18px]" />
+          <span className="hidden xs:inline">Mark Paid</span>
+          <span className="xs:hidden">Paid</span>
         </motion.button>
         
         <motion.button
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => onPrint(order)}
-          className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-3 rounded-xl shadow-md flex items-center justify-center"
+          className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-2 sm:p-3 rounded-lg sm:rounded-xl shadow-md flex items-center justify-center"
           title="Print KOT"
         >
-          <Printer size={18} />
+          <Printer size={16} className="sm:size-[18px]" />
         </motion.button>
         
         <motion.button
@@ -162,7 +165,7 @@ const PendingOrderCard = ({ order, onPaid, onPrint, onCancel }) => {
           whileTap={{ scale: 0.97 }}
           onClick={handleCancel}
           disabled={isCanceling}
-          className="bg-gradient-to-r from-red-600 to-red-700 text-white p-3 rounded-xl shadow-md flex items-center justify-center disabled:opacity-50"
+          className="bg-gradient-to-r from-red-600 to-red-700 text-white p-2 sm:p-3 rounded-lg sm:rounded-xl shadow-md flex items-center justify-center disabled:opacity-50"
           title="Cancel Order"
         >
           {isCanceling ? (
@@ -170,10 +173,10 @@ const PendingOrderCard = ({ order, onPaid, onPrint, onCancel }) => {
               animate={{ rotate: 360 }}
               transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
             >
-              <Clock size={18} />
+              <Clock size={16} className="sm:size-[18px]" />
             </motion.div>
           ) : (
-            <X size={18} />
+            <X size={16} className="sm:size-[18px]" />
           )}
         </motion.button>
       </div>
@@ -187,19 +190,6 @@ const PendingOrdersPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 1024) {
-        setSidebarOpen(false);
-      }
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   const fetchPendingOrders = async () => {
     try {
@@ -208,7 +198,7 @@ const PendingOrdersPage = () => {
       const allOrders = res.data;
       const pending = allOrders.filter((o) => o.status === "pending");
       setPendingOrders(pending);
-      setFilteredOrders(pending); // Initialize filtered orders with all pending orders
+      setFilteredOrders(pending);
     } catch (err) {
       setError("Failed to load pending orders");
       console.error(err);
@@ -305,7 +295,7 @@ const PendingOrdersPage = () => {
   const cancelOrder = async (orderId) => {
     try {
       await API.post(`${API_URL}${orderId}/cancel_order/`);
-      fetchPendingOrders(); // Refresh the list
+      fetchPendingOrders();
     } catch (err) {
       console.error("Cancel order error:", err);
       alert("Failed to cancel order. Please try again.");
@@ -362,180 +352,153 @@ const PendingOrdersPage = () => {
     setTimeout(() => printWindow.print(), 500);
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate("/");
-  };
-
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-        >
-          <Coffee className="text-blue-700" size={64} />
-        </motion.div>
-      </div>
+      <CashierLayout activePage="pending">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              className="mx-auto mb-4"
+            >
+              <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+            </motion.div>
+            <p className="text-blue-900 font-semibold text-lg">Loading Orders...</p>
+          </div>
+        </div>
+      </CashierLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex">
-      <Sidebar
-        active="pending"
-        onLogout={handleLogout}
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
-
-      <main className="flex-1 lg:ml-72 p-6 md:p-10">
-        {/* Mobile Header */}
-        <div className="lg:hidden mb-6 bg-white rounded-2xl shadow-lg p-4 border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={toggleSidebar}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              ></button>
-              <div>
-                <h1 className="text-xl font-bold text-blue-900">
-                  Pending Orders
-                </h1>
-                <p className="text-gray-600 text-sm">Manage payments</p>
-              </div>
+    <CashierLayout activePage="pending">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+            <div className="flex-1 min-w-0">
+              <motion.h1
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900"
+              >
+                Pending Orders
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="text-sm sm:text-base text-gray-600 mt-2"
+              >
+                Manage and process pending payments
+              </motion.p>
             </div>
-            <div className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full font-semibold text-sm">
+            <div className="bg-orange-100 text-orange-800 px-3 sm:px-4 py-2 rounded-full font-semibold text-sm sm:text-base whitespace-nowrap">
               {pendingOrders.length} Pending
             </div>
           </div>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-7xl mx-auto"
-        >
-          {/* Desktop Header */}
-          <div className="mb-8 hidden lg:block">
-            <button
-              onClick={() => navigate("/cashier")}
-              className="flex items-center gap-2 text-blue-700 hover:text-blue-900 mb-4 transition-colors"
-            >
-              <ArrowLeft size={20} />
-              Back to Dashboard
-            </button>
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-4xl font-extrabold text-blue-900">
-                  Pending Orders
-                </h1>
-                <p className="text-gray-700 mt-2">
-                  Manage and process pending payments
-                </p>
-              </div>
-              <div className="bg-orange-100 text-orange-800 px-4 py-2 rounded-full font-semibold">
-                {pendingOrders.length} Pending
-              </div>
-            </div>
-          </div>
-
-          {/* Search Bar */}
-          <div className="mb-6">
-            <div className="relative max-w-md">
-              <Search
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-600"
-                size={20}
-              />
-              <input
-                type="text"
-                placeholder="Search by Order ID..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-6 py-3 rounded-xl border-2 border-blue-200 focus:border-blue-500 outline-none text-base shadow-lg bg-white"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm("")}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                >
-                  <X size={18} />
-                </button>
-              )}
-            </div>
+        {/* Search Bar */}
+        <div className="mb-6">
+          <div className="relative max-w-md">
+            <Search
+              className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-blue-600"
+              size={18}
+            />
+            <input
+              type="text"
+              placeholder="Search by Order ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 sm:pl-12 pr-8 sm:pr-10 py-2.5 sm:py-3 rounded-lg sm:rounded-xl border-2 border-blue-200 focus:border-blue-500 outline-none text-sm sm:text-base shadow-lg bg-white"
+            />
             {searchTerm && (
-              <p className="text-sm text-gray-600 mt-2">
-                Showing {filteredOrders.length} of {pendingOrders.length} orders
-                {searchTerm && ` for order ID: ${searchTerm}`}
-              </p>
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              >
+                <X size={16} />
+              </button>
             )}
           </div>
-
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 flex items-center gap-2">
-              <AlertCircle size={20} />
-              {error}
-            </div>
+          {searchTerm && (
+            <p className="text-xs sm:text-sm text-gray-600 mt-2">
+              Showing {filteredOrders.length} of {pendingOrders.length} orders
+              {searchTerm && ` for order ID: ${searchTerm}`}
+            </p>
           )}
+        </div>
 
-          {/* Pending Orders Grid */}
-          <div>
-            <AnimatePresence>
-              {filteredOrders.length === 0 ? (
-                <div className="bg-white rounded-2xl shadow-lg p-16 text-center border border-gray-200">
-                  {searchTerm ? (
-                    <>
-                      <Search size={80} className="mx-auto text-gray-400 mb-6" />
-                      <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                        No Orders Found
-                      </h3>
-                      <p className="text-gray-600">
-                        No pending orders found for order ID: <strong>"{searchTerm}"</strong>
-                      </p>
-                      <button
-                        onClick={() => setSearchTerm("")}
-                        className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        Clear Search
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle
-                        size={80}
-                        className="mx-auto text-green-400 mb-6"
-                      />
-                      <h3 className="text-2xl font-bold text-green-900 mb-2">
-                        All Clear!
-                      </h3>
-                      <p className="text-gray-600">
-                        No pending orders at the moment
-                      </p>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {filteredOrders.map((order) => (
-                    <PendingOrderCard
-                      key={order.order_id}
-                      order={order}
-                      onPaid={markPaid}
-                      onPrint={printKOT}
-                      onCancel={cancelOrder}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg sm:rounded-xl text-red-700 flex items-center gap-2 text-sm sm:text-base"
+          >
+            <AlertCircle size={18} />
+            {error}
+          </motion.div>
+        )}
+
+        {/* Pending Orders Grid */}
+        <div>
+          <AnimatePresence>
+            {filteredOrders.length === 0 ? (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-8 sm:p-16 text-center border border-gray-200"
+      >
+                {searchTerm ? (
+                  <>
+                    <Search size={60} className="mx-auto text-gray-400 mb-4 sm:mb-6" />
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
+                      No Orders Found
+                    </h3>
+                    <p className="text-gray-600 text-sm sm:text-base mb-4">
+                      No pending orders found for order ID: <strong>"{searchTerm}"</strong>
+                    </p>
+                    <button
+                      onClick={() => setSearchTerm("")}
+                      className="px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
+                    >
+                      Clear Search
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle
+                      size={60}
+                      className="mx-auto text-green-400 mb-4 sm:mb-6"
                     />
-                  ))}
-                </div>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.div>
-      </main>
-    </div>
+                    <h3 className="text-xl sm:text-2xl font-bold text-green-900 mb-2">
+                      All Clear!
+                    </h3>
+                    <p className="text-gray-600 text-sm sm:text-base">
+                      No pending orders at the moment
+                    </p>
+                  </>
+                )}
+              </motion.div>
+            ) : (
+              <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        {filteredOrders.map((order) => (
+          <PendingOrderCard
+            key={order.order_id}
+            order={order}
+            onPaid={markPaid}
+            onPrint={printKOT}
+            onCancel={cancelOrder}
+          />
+        ))}
+      </div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </CashierLayout>
   );
 };
 
