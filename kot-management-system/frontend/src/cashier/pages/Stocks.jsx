@@ -7,7 +7,7 @@ import StockManagement from "../../admin/components/StockManage";
 import Sidebar from "../components/Sidebar";
 import { useNavigate } from "react-router-dom";
 
-const TimingManager = () => {
+const TimingManagers = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("subcategories");
   const [loading, setLoading] = useState(false);
@@ -96,4 +96,4 @@ const TimingManager = () => {
   );
 };
 
-export default TimingManager;
+export default TimingManagers;

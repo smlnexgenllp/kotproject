@@ -13,6 +13,49 @@ export default function CashierWait() {
   const { orderId } = state || {};
 
   const [status, setStatus] = useState("waiting");
+  const [user] = useState(JSON.parse(localStorage.getItem("user") || "{}"));
+  const { tableNumber, cart, selectedSeats = [], tableId } = state || {};
+  const [occupiedTables, setOccupiedTables] = useState([]); // NEW: Occupied tables state
+  const OCCUPIED_TABLES_API = "http://127.0.0.1:8000/api/tables/occupied-tables/";
+
+    useEffect(() => {
+      const fetchTables = async () => {
+        try {
+          setTablesLoading(true);
+          const res = await axios.get(TABLES_API);
+          setActiveTables(res.data);
+        } catch (err) {
+          setTablesError("Failed to load tables");
+          console.error(err);
+        } finally {
+          setTablesLoading(false);
+        }
+      };
+      fetchTables();
+    }, []);
+  
+    // NEW: Fetch occupied tables
+    const fetchOccupiedTables = async () => {
+      try {
+        const res = await axios.get(OCCUPIED_TABLES_API);
+        setOccupiedTables(res.data);
+      } catch (err) {
+        console.error("Error fetching occupied tables:", err);
+        setOccupiedTables([]);
+      }
+    };
+  
+    // Fetch occupied tables on component mount and when seats change
+    useEffect(() => {
+      fetchOccupiedTables();
+    }, []);
+  
+    // NEW: Handle occupied table selection
+    const handleOccupiedTableSelect = async (table) => {
+      setTableNumber(table.table_number);
+      await fetchTableSeats(table.table_number);
+      setShowSeatsModal(true);
+    };
 
   useEffect(() => {
     if (!orderId) {
@@ -60,7 +103,15 @@ export default function CashierWait() {
   if (status === "waiting") {
     return (
       <>
-        <Navbar />
+          <Navbar
+        user={user}
+        onShowCart={() => setShowCartModal(true)}
+        tableNumber={tableNumber}
+        onShowTable={() => setShowTableModal(true)}
+        selectedSeats={selectedSeats}
+        occupiedTables={occupiedTables} // NEW: Pass occupied tables
+        onOccupiedTableSelect={handleOccupiedTableSelect} // NEW: Pass handler
+      />
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-6">
           <motion.div
             initial={{ scale: 0.9 }}
